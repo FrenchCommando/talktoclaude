@@ -1,2 +1,2 @@
 @echo off
-"%~dp0\bin\talktoclaude.exe" "%~dp0\models\ggml-base.en.bin"
+"%~dp0bin\talktoclaude.exe" "%~dp0models\ggml-base.en.bin"

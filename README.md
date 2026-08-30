@@ -38,24 +38,37 @@ then deletes `build\`, so `bin\` is where the runnable app lives.
 
 ## Speed
 
-This is slow on a laptop, and that's expected. whisper runs on the CPU —
-this build has no CUDA/GPU backend, and the dev machine is an i7-8550U (4
-cores / 8 threads, AVX2 but no AVX-512), so `base.en` transcribes at only a
-small multiple of realtime. Loading the model at startup takes ~1.5s, and
-each utterance is transcribed *after* you press stop, not while you talk.
-
-Because transcription is synchronous and blocks the trigger's message loop,
-a button press during transcription is ignored until it finishes.
-
-Every transcription logs its actual numbers, so measure rather than guess:
+Measured on the dev machine (i7-8550U, 4 cores / 8 threads, AVX2, no
+AVX-512; CPU only — this build has no GPU backend):
 
 ```
-[3.4s audio in 2.1s, 1.6x realtime, 8 threads]
+[3.8s audio in 18.1s, 0.2x realtime, 8 threads]
+[3.2s audio in 16.5s, 0.2x realtime, 8 threads]
+[4.2s audio in 18.4s, 0.2x realtime, 8 threads]
 ```
 
-If it's too slow to use, in rough order of payoff: switch to a quantized
-model (`ggml-base.en-q5_1.bin` — same downloader, noticeably faster, small
-accuracy cost), drop to `tiny.en`, or build ggml with a GPU backend.
+Read that `0.2x` carefully — the denominator is what you *said*, but it is
+not what whisper *processed*. Whisper's encoder runs over a fixed 30-second
+mel window (`n_audio_ctx = 1500`), zero-padded, so a 4-second utterance costs
+the same encoder pass as a 30-second one. Against the real 30s window those
+runs are ~1.8x realtime, which is ordinary for `base.en` on this CPU. Nothing
+is malfunctioning; a short sentence is just paying full price.
+
+So expect ~15-20 seconds between pressing stop and the text appearing, mostly
+independent of how long you spoke. Model load at startup is a further ~1.5s,
+once. Transcription is synchronous and blocks the trigger's message loop, so
+a button press during it isn't seen until it finishes.
+
+Ways out, in order of payoff:
+
+- **`wparams.audio_ctx`** — shrink the encoder context to match the actual
+  audio instead of always encoding 30s (whisper.cpp's `--audio-ctx`). Close
+  to a linear encoder speedup for short utterances. Not implemented yet.
+- **Thread count** — `n_threads` is `hardware_concurrency()` (8 here), but
+  there are only 4 physical cores; ggml often does no better, or worse, on
+  hyperthreads. Worth an A/B.
+- **Smaller/quantized model** — `ggml-base.en-q5_1.bin` or `tiny.en`.
+- **A GPU backend** — build ggml with one.
 
 Each run writes `logs/talktoclaude-<timestamp>.log` (gitignored) with
 everything the console shows plus whisper's own diagnostics; `setup.bat`

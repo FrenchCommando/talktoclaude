@@ -19,8 +19,9 @@ std::string exeDir() {
     if (slash == std::wstring::npos) return ".";
     w.resize(slash);
     std::string out(w.size() * 2, '\0');
-    const int len = WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), out.data(),
-                                        (int)out.size(), nullptr, nullptr);
+    const int len = WideCharToMultiByte(CP_UTF8, 0, w.data(), static_cast<int>(w.size()),
+                                        out.data(), static_cast<int>(out.size()), nullptr,
+                                        nullptr);
     out.resize(len < 0 ? 0 : len);
     return out;
 }

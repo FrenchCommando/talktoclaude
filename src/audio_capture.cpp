@@ -2,10 +2,10 @@
 
 #include <atomic>
 #include <cstdio>
-
-#include "logging.h"
 #include <mutex>
 #include <thread>
+
+#include "logging.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>

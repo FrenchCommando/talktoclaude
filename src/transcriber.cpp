@@ -5,7 +5,6 @@
 #include <thread>
 
 #include "logging.h"
-
 #include "whisper.h"
 
 struct Transcriber::Impl {
@@ -53,8 +52,10 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
     wparams.n_threads = static_cast<int>(hw ? hw : 4);
 
     const auto t0 = std::chrono::steady_clock::now();
-    const int rc = whisper_full(impl_->ctx, wparams, audio.data(), static_cast<int>(audio.size()));
-    const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    const int rc =
+        whisper_full(impl_->ctx, wparams, audio.data(), static_cast<int>(audio.size()));
+    const double elapsed =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     if (rc != 0) {
         Log::error("[transcriber] whisper_full failed\n");
         return {};

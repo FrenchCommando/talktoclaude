@@ -1,5 +1,4 @@
-#include <cstdio>
-#include <thread>
+#include <string>
 
 #include "audio_capture.h"
 #include "logging.h"
@@ -16,13 +15,15 @@ int main(int argc, char** argv) {
     Transcriber transcriber;
     if (!transcriber.loadModel(modelPath)) {
         Log::error("Pass the model path as the first argument if it's not at %s\n",
-                modelPath.c_str());
+                   modelPath.c_str());
+        Log::close();
         return 1;
     }
 
     AudioCapture capture;
     if (!capture.init()) {
         Log::error("Failed to initialize audio capture.\n");
+        Log::close();
         return 1;
     }
 

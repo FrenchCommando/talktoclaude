@@ -83,7 +83,8 @@ void Trigger::run() {
 
     InMemoryRandomAccessStream stream;
     DataWriter writer(stream);
-    writer.WriteBytes(array_view<uint8_t const>(wavBytes.data(), wavBytes.data() + wavBytes.size()));
+    writer.WriteBytes(
+        array_view<uint8_t const>(wavBytes.data(), wavBytes.data() + wavBytes.size()));
     writer.StoreAsync().get();
     writer.DetachStream();
     stream.Seek(0);
