@@ -8,10 +8,18 @@ if(NOT WIN32)
   message(FATAL_ERROR "talktoclaude targets Windows (WASAPI + Win32 SendInput/hooks).")
 endif()
 
-# whisper.cpp — vendored under third_party/, built as a static lib we link into our exe.
+# whisper.cpp — fetched at configure time (pinned to a specific commit, not
+# a moving branch) rather than vendored/submoduled. No separate "init
+# submodules" step to remember; `cmake -B build` alone is enough.
+include(FetchContent)
 set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory(third_party/whisper.cpp)
+FetchContent_Declare(
+    whisper_cpp
+    GIT_REPOSITORY https://github.com/ggerganov/whisper.cpp.git
+    GIT_TAG        c4ac0012a8f5a2082dfca6aad4ddfd8b2c02b337
+)
+FetchContent_MakeAvailable(whisper_cpp)
 
 add_executable(talktoclaude
     src/main.cpp
@@ -22,8 +30,8 @@ add_executable(talktoclaude
 )
 
 target_include_directories(talktoclaude PRIVATE
-    third_party/whisper.cpp/include
-    third_party/whisper.cpp/ggml/include
+    ${whisper_cpp_SOURCE_DIR}/include
+    ${whisper_cpp_SOURCE_DIR}/ggml/include
 )
 
 target_link_libraries(talktoclaude PRIVATE

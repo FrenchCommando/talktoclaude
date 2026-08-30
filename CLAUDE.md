@@ -46,13 +46,14 @@ window has focus (Claude Code's terminal, in practice). Local, no cloud STT.
 - [ ] C++ compiler — installing now (Visual Studio "Build Tools for Visual
       Studio 2022", "Desktop development with C++" workload).
       Download page: https://visualstudio.microsoft.com/downloads/
-- [x] whisper.cpp vendored at `third_party/whisper.cpp` (shallow clone)
+- [x] whisper.cpp fetched via CMake `FetchContent` (pinned commit, not a
+      submodule — avoids the "forgot to init submodules" class of pain)
 - [x] Project scaffolding written (see Code layout below) — NOT YET BUILT,
       waiting on the compiler. Expect first-build issues to shake out.
 
 ## Code layout
 
-- `CMakeLists.txt` — pulls in `third_party/whisper.cpp` as a subdirectory,
+- `CMakeLists.txt` — fetches whisper.cpp via `FetchContent` (pinned commit),
   builds `talktoclaude.exe` linking whisper + ole32/user32/winmm.
 - `src/audio_capture.{h,cpp}` — WASAPI mic capture (shared mode, event-driven),
   downmixes to mono and linearly resamples to 16kHz float32 for whisper.

@@ -12,21 +12,20 @@ Requires: MSVC (Visual Studio Build Tools, "Desktop development with C++"
 workload) and CMake — both are needed for whisper.cpp and the WASAPI/Win32
 code here.
 
+whisper.cpp isn't vendored/submoduled — CMake fetches it (pinned to a
+specific commit) the first time you configure:
+
 ```
-git submodule update --init --recursive   # if third_party/whisper.cpp is empty
 cmake -B build -S .
 cmake --build build --config Release
 ```
 
 ## Get a model
 
-Not vendored (they're large). Fetch one of whisper.cpp's GGML models, e.g.:
-
-```
-third_party/whisper.cpp/models/download-ggml-model.cmd base.en
-```
-
-or download directly from
+Not vendored (they're large). `setup.bat` fetches `base.en` automatically
+via whisper.cpp's downloader script (found under CMake's FetchContent build
+dir, `build/_deps/whisper_cpp-src/models/download-ggml-model.cmd`), or
+download directly from
 https://huggingface.co/ggerganov/whisper.cpp/tree/main and drop it in
 `models/`.
 

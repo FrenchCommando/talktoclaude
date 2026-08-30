@@ -41,7 +41,7 @@ if %ERRORLEVEL% neq 0 goto :fail
 if not exist "%~dp0models" mkdir "%~dp0models"
 if not exist "%~dp0models\ggml-base.en.bin" (
     echo === Fetching base.en model ===
-    call "%~dp0third_party\whisper.cpp\models\download-ggml-model.cmd" base.en "%~dp0models"
+    call "%~dp0build\_deps\whisper_cpp-src\models\download-ggml-model.cmd" base.en "%~dp0models"
 )
 
 echo.
