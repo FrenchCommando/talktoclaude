@@ -22,8 +22,15 @@ public:
 
     bool isRecording() const { return recording_; }
 
+    // Loudest sample of the last stop()'d capture. Exactly 0.0 means the
+    // device handed over nothing but digital silence — a muted mic, or a
+    // Bluetooth headset whose mic endpoint isn't live — which is worth
+    // reporting differently from "whisper heard no words".
+    float lastPeak() const { return lastPeak_; }
+
 private:
     struct Impl;
     Impl* impl_;
     bool recording_ = false;
+    float lastPeak_ = 0.0f;
 };

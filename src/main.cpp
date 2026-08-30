@@ -34,8 +34,12 @@ int main(int argc, char** argv) {
             Log::info("[listening...]\n");
             capture.start();
         } else {
-            Log::info("[transcribing...]\n");
             std::vector<float> audio = capture.stop();
+            if (audio.empty() || capture.lastPeak() == 0.0f) {
+                Log::info("[no audio captured - the mic delivered silence]\n");
+                return;
+            }
+            Log::info("[transcribing...]\n");
             std::string text = transcriber.transcribe(audio);
             if (text.empty()) {
                 Log::info("[no speech detected]\n");
