@@ -49,17 +49,17 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
     wparams.no_context = true;
     // whisper runs on the CPU here, and on a laptop it's the slow part of the
     // whole pipeline — use every core there is.
-    unsigned hw = std::thread::hardware_concurrency();
+    const unsigned hw = std::thread::hardware_concurrency();
     wparams.n_threads = static_cast<int>(hw ? hw : 4);
 
-    auto t0 = std::chrono::steady_clock::now();
-    int rc = whisper_full(impl_->ctx, wparams, audio.data(), static_cast<int>(audio.size()));
-    double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+    const auto t0 = std::chrono::steady_clock::now();
+    const int rc = whisper_full(impl_->ctx, wparams, audio.data(), static_cast<int>(audio.size()));
+    const double elapsed = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
     if (rc != 0) {
         Log::error("[transcriber] whisper_full failed\n");
         return {};
     }
-    double seconds = audio.size() / 16000.0;
+    const double seconds = audio.size() / 16000.0;
     Log::info("[%.1fs audio in %.1fs, %.1fx realtime, %d threads]\n", seconds, elapsed,
               elapsed > 0 ? seconds / elapsed : 0.0, wparams.n_threads);
 

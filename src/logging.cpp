@@ -12,15 +12,15 @@ std::string g_path;
 
 std::string exeDir() {
     wchar_t buf[MAX_PATH];
-    DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
+    const DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
     if (n == 0 || n == MAX_PATH) return ".";
     std::wstring w(buf, n);
-    size_t slash = w.find_last_of(L"\\/");
+    const size_t slash = w.find_last_of(L"\\/");
     if (slash == std::wstring::npos) return ".";
     w.resize(slash);
     std::string out(w.size() * 2, '\0');
-    int len = WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), out.data(),
-                                  (int)out.size(), nullptr, nullptr);
+    const int len = WideCharToMultiByte(CP_UTF8, 0, w.data(), (int)w.size(), out.data(),
+                                        (int)out.size(), nullptr, nullptr);
     out.resize(len < 0 ? 0 : len);
     return out;
 }
