@@ -31,7 +31,7 @@ call "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" x64
 if %ERRORLEVEL% neq 0 goto :fail
 
 echo === Configuring ===
-cmake -B build -S "%~dp0" -G "NMake Makefiles"
+cmake -B build -S "%~dp0." -G "NMake Makefiles"
 if %ERRORLEVEL% neq 0 goto :fail
 
 echo === Building ===

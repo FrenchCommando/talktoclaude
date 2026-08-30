@@ -3,27 +3,45 @@
 Voice dictation tool for Windows: speak a command, it gets typed into whatever
 window has focus (Claude Code's terminal, in practice). Local, no cloud STT.
 
-## Plan
+Working end-to-end: earbuds button starts/stops recording, whisper.cpp
+transcribes, the text is typed into the focused window followed by Enter so
+it submits on its own.
+
+## Design
 
 - **Language**: C++. Single self-contained .exe, no Python/interpreter layer.
-- **STT**: `whisper.cpp`, linked in directly (not shelled out to) — model size
-  TBD, start with `base.en` or `small` for the CPU/accuracy tradeoff.
+- **STT**: `whisper.cpp`, linked in directly (not shelled out to), `base.en`
+  model.
 - **Audio capture**: WASAPI (native Win32/COM), captures mic while armed.
-- **Trigger**: NOT a keyboard hotkey. Google Pixel Buds are paired to the PC
-  over Bluetooth AVRCP, so the play/pause button press arrives as a system
-  media key event (`VK_MEDIA_PLAY_PAUSE`). Hook that globally (low-level
-  keyboard hook) as start/stop recording.
+- **Trigger**: Google Pixel Buds paired over Bluetooth AVRCP. AVRCP
+  play/pause does **not** surface as a `WH_KEYBOARD_LL` keyboard event on
+  this system — confirmed by testing: a real keyboard's media key does show
+  up as `VK_MEDIA_PLAY_PAUSE` there, the earbuds' AVRCP press does not, and
+  pressing it just paused whatever video was playing instead of reaching our
+  hook. It's routed through Windows' System Media Transport Controls (SMTC)
+  layer straight to whichever app owns the "now playing" session.
+  Interception is instead done by making `talktoclaude` itself the active
+  SMTC session (silent looping audio via `MediaPlayer`) and listening for
+  `SystemMediaTransportControls.ButtonPressed`. See `src/trigger.cpp`.
   - Note: the Buds' Assistant long-press is Android/Google-Assistant-only and
     does NOT cross over to Windows — only the standard transport buttons
-    (play/pause/skip) do, via Bluetooth AVRCP. Use play/pause.
+    (play/pause/skip) do, via AVRCP. Use play/pause.
 - **Text injection**: `SendInput` (Win32) to type the transcript into
-  whatever window currently has focus.
+  whatever window currently has focus, followed by a synthesized Enter so
+  it submits without a manual keypress.
 
 ## Pipeline
 
-1. Buds play/pause press → toggle recording (WASAPI capture starts).
-2. Press again (or on silence, TBD) → stop capture, run through whisper.cpp.
-3. Type the resulting transcript into the focused window via `SendInput`.
+1. Buds play/pause press → SMTC `ButtonPressed` → toggle recording (WASAPI
+   capture starts).
+2. Press again → stop capture, run through whisper.cpp.
+3. Type the resulting transcript into the focused window via `SendInput`,
+   then send Enter.
+
+Caveat (expected, not a bug): `SendInput` has no target window of its own —
+whatever has focus *when transcription finishes* gets the keystrokes. Make
+sure the intended text field is focused before pressing stop (not
+necessarily before pressing start).
 
 ## Why these choices (context from planning discussion)
 
@@ -39,47 +57,55 @@ window has focus (Claude Code's terminal, in practice). Local, no cloud STT.
 - FluidVoice (github.com/altic-dev/FluidVoice) itself is not portable — pure
   Swift/Xcode/macOS project, no code reuse possible, only served as the
   inspiration for the feature set.
+- Originally planned a `WH_KEYBOARD_LL` keyboard hook for the trigger
+  (assuming AVRCP play/pause shows up as `VK_MEDIA_PLAY_PAUSE`) — abandoned
+  after testing showed the earbuds' press never reaches that hook; switched
+  to claiming the SMTC "now playing" session instead (see Design above).
 
-## Setup status
+## Setup
 
-- [x] CMake already installed (`C:\Program Files\CMake\bin\cmake.exe`)
-- [ ] C++ compiler — installing now (Visual Studio "Build Tools for Visual
-      Studio 2022", "Desktop development with C++" workload).
-      Download page: https://visualstudio.microsoft.com/downloads/
-- [x] whisper.cpp fetched via CMake `FetchContent` (pinned commit, not a
-      submodule — avoids the "forgot to init submodules" class of pain)
-- [x] Project scaffolding written (see Code layout below) — NOT YET BUILT,
-      waiting on the compiler. Expect first-build issues to shake out.
+- `setup.bat` — locates the VS Build Tools toolchain via `vswhere` +
+  `vcvarsall.bat` (no need for a special Developer Command Prompt),
+  configures + builds with CMake/NMake, and fetches `ggml-base.en.bin` if
+  `models/` doesn't have it yet. Batch files in this repo need CRLF line
+  endings — cmd.exe mis-parses LF-only files.
+- `run.bat` — runs `build\talktoclaude.exe models\ggml-base.en.bin`.
+  Double-click it or run from a terminal; no dev environment needed to run,
+  only to build.
+- To close the app: close the console window, or Ctrl+C in it.
 
 ## Code layout
 
 - `CMakeLists.txt` — fetches whisper.cpp via `FetchContent` (pinned commit),
-  builds `talktoclaude.exe` linking whisper + ole32/user32/winmm.
+  builds `talktoclaude.exe` linking whisper + ole32/user32/winmm/windowsapp
+  (WinRT projection, for SMTC). Copies whisper/ggml's shared-lib DLLs next
+  to the exe post-build — they're built into `build/bin/`, and Windows only
+  auto-loads DLLs from the exe's own directory or PATH.
 - `src/audio_capture.{h,cpp}` — WASAPI mic capture (shared mode, event-driven),
   downmixes to mono and linearly resamples to 16kHz float32 for whisper.
   Assumes the shared-mode mix format is IEEE float (normal on modern Windows;
-  revisit if `GetMixFormat` ever returns PCM int).
-- `src/trigger.{h,cpp}` — low-level keyboard hook (`WH_KEYBOARD_LL`) watching
-  for `VK_MEDIA_PLAY_PAUSE`. A paired Bluetooth device's play/pause button
-  surfaces as this same virtual key via AVRCP, so this covers both the
-  earbuds and a keyboard media key (handy for testing without the buds).
-  Toggle semantics: press to start, press again to stop.
+  revisit if `GetMixFormat` ever returns PCM int). Calls
+  `CoInitializeEx(COINIT_MULTITHREADED)` on the main thread — `trigger.cpp`'s
+  WinRT init has to match this apartment type (MTA) or it throws
+  `RPC_E_CHANGED_MODE`.
+- `src/trigger.{h,cpp}` — WinRT `SystemMediaTransportControls`-based trigger
+  (see Design above). Plays a tiny silent looping WAV via `MediaPlayer` to
+  claim the SMTC session, listens for `ButtonPressed` (checks for both
+  `Play` and `Pause` button values — there's no combined `PlayPause` enum
+  member). Toggle semantics: press to start, press again to stop.
 - `src/transcriber.{h,cpp}` — thin whisper.cpp wrapper, loads a GGML model
   once, `transcribe(audio)` runs `whisper_full` and returns trimmed text.
-- `src/text_injector.{h,cpp}` — `SendInput` with `KEYEVENTF_UNICODE`, types
-  the transcript into whatever window has focus.
+- `src/text_injector.{h,cpp}` — `SendInput` with `KEYEVENTF_UNICODE` to type
+  the transcript into whatever window has focus, then a synthesized
+  `VK_RETURN` so it submits.
 - `src/main.cpp` — wires it together: model path from argv[1] (default
   `models/ggml-base.en.bin`), trigger callback starts/stops capture and
   transcribes+types on stop.
 
-## Next step
+## Known rough edges (not blocking, revisit if annoying)
 
-1. Finish installing the C++ Build Tools.
-2. `cmake -B build -S .` then `cmake --build build --config Release` — fix
-   whatever breaks (first build against a freshly vendored whisper.cpp,
-   untested).
-3. Fetch a GGML model (see README) and do an end-to-end test: pair earbuds,
-   press play/pause, talk, confirm text lands in a focused text box.
-4. Known rough edges to revisit once it's working: no VAD/auto-stop (must
-   press the button twice per utterance), no silence trimming, single fixed
-   language ("en") hardcoded in transcriber.cpp.
+- No VAD/auto-stop — must press the button twice per utterance.
+- No silence trimming.
+- Single fixed language ("en") hardcoded in transcriber.cpp.
+- Transcription is synchronous and blocks the SMTC message loop, so a button
+  press during transcription won't register until it finishes.

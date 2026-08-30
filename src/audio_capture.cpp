@@ -89,7 +89,7 @@ struct AudioCapture::Impl {
                 hr = captureClient->GetBuffer(&data, &framesAvailable, &flags, nullptr, nullptr);
                 if (FAILED(hr)) break;
 
-                if (framesAvailable > 0 && !(flags & AUDIOCLNT_BUFFERFLAGS_SILENT)) {
+                if (framesAvailable > 0 && !(flags & AUDCLNT_BUFFERFLAGS_SILENT)) {
                     std::lock_guard<std::mutex> lock(bufferMutex);
                     appendResampled(buffer, reinterpret_cast<float*>(data),
                                      framesAvailable, mixFormat->nChannels,

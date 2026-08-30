@@ -34,6 +34,17 @@ void typeText(const std::string& utf8Text) {
         inputs.push_back(up);
     }
 
+    // Follow with Enter so the transcript submits directly (e.g. into a
+    // terminal prompt) instead of needing a manual keypress after each one.
+    INPUT enterDown{};
+    enterDown.type = INPUT_KEYBOARD;
+    enterDown.ki.wVk = VK_RETURN;
+    inputs.push_back(enterDown);
+
+    INPUT enterUp = enterDown;
+    enterUp.ki.dwFlags = KEYEVENTF_KEYUP;
+    inputs.push_back(enterUp);
+
     SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
 }
 

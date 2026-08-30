@@ -39,6 +39,18 @@ target_link_libraries(talktoclaude PRIVATE
     ole32       # COM (WASAPI)
     user32      # SendInput, hooks
     winmm       # timing helpers
+    windowsapp  # WinRT projection (SystemMediaTransportControls)
 )
 
 target_compile_definitions(talktoclaude PRIVATE UNICODE _UNICODE)
+
+# whisper/ggml build as shared libs into build/bin; Windows only auto-loads
+# DLLs next to the exe (build/) or on PATH, so copy them alongside it.
+add_custom_command(TARGET talktoclaude POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:whisper>
+        $<TARGET_FILE:ggml>
+        $<TARGET_FILE:ggml-base>
+        $<TARGET_FILE:ggml-cpu>
+        $<TARGET_FILE_DIR:talktoclaude>
+)
