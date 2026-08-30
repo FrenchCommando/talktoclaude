@@ -1,9 +1,11 @@
 #include "trigger.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Media.Control.h>
 #include <winrt/Windows.Media.Core.h>
 #include <winrt/Windows.Storage.Streams.h>
 
@@ -65,6 +67,24 @@ std::vector<uint8_t> buildSilentWav() {
     return wav;
 }
 
+// Who currently owns the "now playing" session — that is, where the hardware
+// media button's press gets delivered. There's still no way to *force* the
+// session, but Windows.Media.Control can at least report it, which separates
+// the two failure modes that look identical from here: another app stole the
+// button, versus the press never reaching Windows at all (a Bluetooth headset
+// sitting in hands-free mode has no AVRCP transport to send it over).
+std::string currentSessionOwner() {
+    using namespace winrt::Windows::Media::Control;
+    try {
+        auto manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().get();
+        auto session = manager.GetCurrentSession();
+        if (!session) return "(no session at all)";
+        return winrt::to_string(session.SourceAppUserModelId());
+    } catch (winrt::hresult_error const& error) {
+        return "(query failed: " + winrt::to_string(error.message()) + ")";
+    }
+}
+
 } // namespace
 
 Trigger::Trigger(ToggleCallback callback) : callback_(std::move(callback)) {}
@@ -77,6 +97,12 @@ void Trigger::onButtonPressed(
     SystemMediaTransportControls const&,
     SystemMediaTransportControlsButtonPressedEventArgs const& args) {
     const auto button = args.Button();
+    // Logged before the filter: a press that arrives as some other button was
+    // previously discarded in silence, which is indistinguishable from the
+    // press never arriving at all. Enum order is Play 0, Pause 1, Stop 2,
+    // Record 3, FastForward 4, Rewind 5, Next 6, Previous 7.
+    Log::info("[smtc button pressed: %d]\n", static_cast<int>(button));
+
     if (button != SystemMediaTransportControlsButton::Play &&
         button != SystemMediaTransportControlsButton::Pause) {
         return;
@@ -104,6 +130,7 @@ void Trigger::run() {
 
     wavStream_ = stream;
     startSession();
+    reportSessionOwner();
 
     // Thread-bound hotkey: WM_HOTKEY arrives in this loop, not a window proc.
     if (RegisterHotKey(nullptr, kReclaimHotkeyId, kReclaimHotkeyMods, kReclaimHotkeyVk)) {
@@ -149,10 +176,25 @@ void Trigger::startSession() {
     // is skipped when routing the hardware media button. Inaudible instead.
     mediaPlayer_.Volume(0.001);
 
+    // The claim rests entirely on this stream actually playing, and it renders
+    // to whatever the default output is — which, with Bluetooth earbuds, can
+    // vanish underneath us when they switch profile. Failing silently here
+    // looks exactly like a dead button, so say so.
+    mediaFailedToken_ = mediaPlayer_.MediaFailed(
+        [](MediaPlayer const&, MediaPlayerFailedEventArgs const& args) {
+            Log::error("[trigger] silent stream failed: %s (0x%08lx)\n",
+                       winrt::to_string(args.ErrorMessage()).c_str(),
+                       static_cast<unsigned long>(args.ExtendedErrorCode()));
+        });
+
     auto smtc = mediaPlayer_.SystemMediaTransportControls();
     smtc.IsEnabled(true);
     smtc.IsPlayEnabled(true);
     smtc.IsPauseEnabled(true);
+    // Windows only delivers buttons that are enabled. Stop costs nothing to
+    // accept and means a press arriving as Stop shows up in the log instead of
+    // being dropped by Windows before we ever see it.
+    smtc.IsStopEnabled(true);
     buttonPressedToken_ = smtc.ButtonPressed({this, &Trigger::onButtonPressed});
 
     mediaPlayer_.Play();
@@ -163,20 +205,48 @@ void Trigger::endSession() {
     if (!mediaPlayer_) return;
     mediaPlayer_.SystemMediaTransportControls().ButtonPressed(buttonPressedToken_);
     buttonPressedToken_ = {};
+    mediaPlayer_.MediaFailed(mediaFailedToken_);
+    mediaFailedToken_ = {};
     mediaPlayer_.Pause();
+    // Dropping the reference is not enough: MediaPlayer holds the SMTC
+    // registration until it is explicitly closed, so a re-claim every 3s was
+    // leaving a growing pile of players that still claim the button but whose
+    // handlers we have already revoked. Presses routed to one of those corpses
+    // go nowhere, which is exactly the "button does nothing" symptom.
+    mediaPlayer_.Close();
     mediaPlayer_ = nullptr;
 }
 
 void Trigger::reclaim(bool announce) {
     if (!wavStream_) return;
+
+    // Sampled before the teardown: this is the state the claim was actually in
+    // over the last interval, which is the part worth knowing. MediaPlaybackState:
+    // 0 None, 1 Opening, 2 Buffering, 3 Playing, 4 Paused.
+    if (mediaPlayer_ && mediaPlayer_.PlaybackSession()) {
+        Log::fileOnly("[trigger] silent stream state: %d\n",
+                      static_cast<int>(mediaPlayer_.PlaybackSession().PlaybackState()));
+    }
+
     endSession();
     startSession();
+    reportSessionOwner();
+
     if (announce) {
         Log::info("[media button re-claimed]\n");
     } else {
         // Every few seconds — only worth having when reading the log later.
         Log::fileOnly("[media button re-claimed]\n");
     }
+}
+
+// Logged only when it changes: unchanged it's noise every 3s, but the moment
+// it moves it names whatever took the button.
+void Trigger::reportSessionOwner() {
+    std::string owner = currentSessionOwner();
+    if (owner == lastSessionOwner_) return;
+    Log::info("[media button owned by: %s]\n", owner.c_str());
+    lastSessionOwner_ = std::move(owner);
 }
 
 void Trigger::stop() {

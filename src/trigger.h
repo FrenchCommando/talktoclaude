@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <winrt/Windows.Media.h>
 #include <winrt/Windows.Media.Playback.h>
 #include <winrt/Windows.Storage.Streams.h>
@@ -64,11 +65,17 @@ private:
     winrt::Windows::Media::Playback::MediaPlayer mediaPlayer_{nullptr};
     winrt::Windows::Storage::Streams::InMemoryRandomAccessStream wavStream_{nullptr};
     winrt::event_token buttonPressedToken_{};
+    winrt::event_token mediaFailedToken_{};
+
+    // Last owner reported by Windows.Media.Control, so a re-claim only logs
+    // when the button actually changes hands.
+    std::string lastSessionOwner_;
 
     // A re-claim tears the player down and builds a new one; the silent WAV
     // stream outlives both.
     void startSession();
     void endSession();
+    void reportSessionOwner();
 
     void onButtonPressed(
         winrt::Windows::Media::SystemMediaTransportControls const& sender,
