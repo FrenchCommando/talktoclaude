@@ -19,10 +19,21 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/ggerganov/whisper.cpp.git
     GIT_TAG        c4ac0012a8f5a2082dfca6aad4ddfd8b2c02b337
 )
+# whisper.cpp's top-level CMakeLists still declares cmake_minimum_required
+# below 3.10, which newer CMake warns about. It's upstream's file — we can't
+# fix it here and re-fetching would undo an edit anyway — so just mute
+# deprecation warnings while its subdirectory is added.
+if(NOT DEFINED CMAKE_WARN_DEPRECATED)
+  set(CMAKE_WARN_DEPRECATED ON)
+endif()
+set(_ttc_warn_deprecated ${CMAKE_WARN_DEPRECATED})
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(whisper_cpp)
+set(CMAKE_WARN_DEPRECATED ${_ttc_warn_deprecated} CACHE BOOL "" FORCE)
 
 add_executable(talktoclaude
     src/main.cpp
+    src/logging.cpp
     src/audio_capture.cpp
     src/trigger.cpp
     src/text_injector.cpp

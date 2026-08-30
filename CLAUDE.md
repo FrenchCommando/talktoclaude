@@ -67,12 +67,22 @@ necessarily before pressing start).
 - `setup.bat` — locates the VS Build Tools toolchain via `vswhere` +
   `vcvarsall.bat` (no need for a special Developer Command Prompt),
   configures + builds with CMake/NMake, and fetches `ggml-base.en.bin` if
-  `models/` doesn't have it yet. Batch files in this repo need CRLF line
-  endings — cmd.exe mis-parses LF-only files.
-- `run.bat` — runs `build\talktoclaude.exe models\ggml-base.en.bin`.
+  `models/` doesn't have it yet. Then it stages `talktoclaude.exe` plus the
+  whisper/ggml DLLs into `bin/` and deletes `build/` entirely — the only
+  thing kept is what's needed to run. Re-running setup.bat therefore
+  re-clones and rebuilds whisper.cpp from scratch. Batch files in this repo
+  need CRLF line endings — cmd.exe mis-parses LF-only files.
+- `run.bat` — runs `bin\talktoclaude.exe models\ggml-base.en.bin`.
   Double-click it or run from a terminal; no dev environment needed to run,
   only to build.
 - To close the app: close the console window, or Ctrl+C in it.
+- `logs/` (gitignored) — timestamped files, kept across runs:
+  `setup-<stamp>.log` (full configure/build output, teed to console),
+  `cmake-configure-<stamp>.yaml` (CMake's own configure log, rescued from
+  `build/` before it's deleted), and `talktoclaude-<stamp>.log` (one per app
+  run). setup.bat's tee helper flattens PowerShell's ErrorRecord wrapping and
+  writes UTF-8; `Tee-Object` alone would emit UTF-16 with PowerShell's error
+  framing around every stderr line.
 
 ## Code layout
 
@@ -98,6 +108,11 @@ necessarily before pressing start).
 - `src/text_injector.{h,cpp}` — `SendInput` with `KEYEVENTF_UNICODE` to type
   the transcript into whatever window has focus, then a synthesized
   `VK_RETURN` so it submits.
+- `src/logging.{h,cpp}` — console + file logging into `logs/`, resolved
+  relative to the exe (`bin/../logs`). `Log::info`/`Log::error` mirror to
+  stdout/stderr, `Log::fileOnly` doesn't — whisper/ggml's own log callback is
+  pointed at it so their per-run chatter is recorded without burying the
+  console.
 - `src/main.cpp` — wires it together: model path from argv[1] (default
   `models/ggml-base.en.bin`), trigger callback starts/stops capture and
   transcribes+types on stop.

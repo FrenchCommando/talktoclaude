@@ -1,2 +1,4 @@
 build/
 models/
+bin/
+logs/

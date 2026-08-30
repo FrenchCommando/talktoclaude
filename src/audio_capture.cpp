@@ -2,6 +2,8 @@
 
 #include <atomic>
 #include <cstdio>
+
+#include "logging.h"
 #include <mutex>
 #include <thread>
 
@@ -117,38 +119,38 @@ AudioCapture::~AudioCapture() {
 bool AudioCapture::init() {
     HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
-        fprintf(stderr, "[audio] CoInitializeEx failed: 0x%08lx\n", hr);
+        Log::error("[audio] CoInitializeEx failed: 0x%08lx\n", hr);
         return false;
     }
 
     hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr, CLSCTX_ALL,
                            __uuidof(IMMDeviceEnumerator),
                            reinterpret_cast<void**>(&impl_->enumerator));
-    if (FAILED(hr)) { fprintf(stderr, "[audio] enumerator failed\n"); return false; }
+    if (FAILED(hr)) { Log::error("[audio] enumerator failed\n"); return false; }
 
     hr = impl_->enumerator->GetDefaultAudioEndpoint(eCapture, eConsole, &impl_->device);
-    if (FAILED(hr)) { fprintf(stderr, "[audio] no default capture device\n"); return false; }
+    if (FAILED(hr)) { Log::error("[audio] no default capture device\n"); return false; }
 
     hr = impl_->device->Activate(__uuidof(IAudioClient), CLSCTX_ALL, nullptr,
                                   reinterpret_cast<void**>(&impl_->audioClient));
-    if (FAILED(hr)) { fprintf(stderr, "[audio] Activate(IAudioClient) failed\n"); return false; }
+    if (FAILED(hr)) { Log::error("[audio] Activate(IAudioClient) failed\n"); return false; }
 
     hr = impl_->audioClient->GetMixFormat(&impl_->mixFormat);
-    if (FAILED(hr)) { fprintf(stderr, "[audio] GetMixFormat failed\n"); return false; }
+    if (FAILED(hr)) { Log::error("[audio] GetMixFormat failed\n"); return false; }
 
     REFERENCE_TIME bufferDuration = 10 * 1000 * 1000; // 1 second, generous.
     hr = impl_->audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED,
                                          AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
                                          bufferDuration, 0, impl_->mixFormat, nullptr);
-    if (FAILED(hr)) { fprintf(stderr, "[audio] Initialize failed: 0x%08lx\n", hr); return false; }
+    if (FAILED(hr)) { Log::error("[audio] Initialize failed: 0x%08lx\n", hr); return false; }
 
     impl_->captureEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
     hr = impl_->audioClient->SetEventHandle(impl_->captureEvent);
-    if (FAILED(hr)) { fprintf(stderr, "[audio] SetEventHandle failed\n"); return false; }
+    if (FAILED(hr)) { Log::error("[audio] SetEventHandle failed\n"); return false; }
 
     hr = impl_->audioClient->GetService(__uuidof(IAudioCaptureClient),
                                          reinterpret_cast<void**>(&impl_->captureClient));
-    if (FAILED(hr)) { fprintf(stderr, "[audio] GetService(capture) failed\n"); return false; }
+    if (FAILED(hr)) { Log::error("[audio] GetService(capture) failed\n"); return false; }
 
     impl_->threadShouldRun = true;
     impl_->captureThread = std::thread([this] { impl_->captureLoop(); });
