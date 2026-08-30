@@ -64,14 +64,14 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
               elapsed > 0 ? seconds / elapsed : 0.0, wparams.n_threads);
 
     std::string result;
-    int nSegments = whisper_full_n_segments(impl_->ctx);
+    const int nSegments = whisper_full_n_segments(impl_->ctx);
     for (int i = 0; i < nSegments; ++i) {
         result += whisper_full_get_segment_text(impl_->ctx, i);
     }
 
     // Trim leading/trailing whitespace whisper tends to emit.
-    size_t start = result.find_first_not_of(" \t\n\r");
-    size_t end = result.find_last_not_of(" \t\n\r");
+    const size_t start = result.find_first_not_of(" \t\n\r");
+    const size_t end = result.find_last_not_of(" \t\n\r");
     if (start == std::string::npos) return {};
     return result.substr(start, end - start + 1);
 }

@@ -37,15 +37,15 @@ void appendResampled(std::vector<float>& out, const float* interleaved,
     }
 
     // Linear-interpolation resample srcRate -> 16kHz.
-    double ratio = static_cast<double>(srcRate) / kTargetSampleRate;
-    size_t outFrames = static_cast<size_t>(frames / ratio);
-    size_t base = out.size();
+    const double ratio = static_cast<double>(srcRate) / kTargetSampleRate;
+    const size_t outFrames = static_cast<size_t>(frames / ratio);
+    const size_t base = out.size();
     out.resize(base + outFrames);
     for (size_t i = 0; i < outFrames; ++i) {
-        double srcPos = i * ratio;
-        size_t i0 = static_cast<size_t>(srcPos);
-        size_t i1 = (i0 + 1 < frames) ? i0 + 1 : i0;
-        float frac = static_cast<float>(srcPos - i0);
+        const double srcPos = i * ratio;
+        const size_t i0 = static_cast<size_t>(srcPos);
+        const size_t i1 = (i0 + 1 < frames) ? i0 + 1 : i0;
+        const float frac = static_cast<float>(srcPos - i0);
         out[base + i] = mono[i0] * (1.0f - frac) + mono[i1] * frac;
     }
 }
@@ -76,10 +76,10 @@ struct AudioCapture::Impl {
 
     void captureLoop() {
         HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-        bool comInitializedHere = SUCCEEDED(hr);
+        const bool comInitializedHere = SUCCEEDED(hr);
 
         while (threadShouldRun.load()) {
-            DWORD waitResult = WaitForSingleObject(captureEvent, 200);
+            const DWORD waitResult = WaitForSingleObject(captureEvent, 200);
             if (waitResult != WAIT_OBJECT_0) continue;
 
             UINT32 packetLength = 0;
@@ -138,7 +138,7 @@ bool AudioCapture::init() {
     hr = impl_->audioClient->GetMixFormat(&impl_->mixFormat);
     if (FAILED(hr)) { Log::error("[audio] GetMixFormat failed\n"); return false; }
 
-    REFERENCE_TIME bufferDuration = 10 * 1000 * 1000; // 1 second, generous.
+    const REFERENCE_TIME bufferDuration = 10 * 1000 * 1000; // 1 second, generous.
     hr = impl_->audioClient->Initialize(AUDCLNT_SHAREMODE_SHARED,
                                          AUDCLNT_STREAMFLAGS_EVENTCALLBACK,
                                          bufferDuration, 0, impl_->mixFormat, nullptr);

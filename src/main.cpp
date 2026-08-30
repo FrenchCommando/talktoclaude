@@ -8,7 +8,7 @@
 #include "trigger.h"
 
 int main(int argc, char** argv) {
-    std::string modelPath = (argc > 1) ? argv[1] : "models/ggml-base.en.bin";
+    const std::string modelPath = (argc > 1) ? argv[1] : "models/ggml-base.en.bin";
 
     Log::init();
     if (!Log::path().empty()) Log::info("Logging to %s\n", Log::path().c_str());

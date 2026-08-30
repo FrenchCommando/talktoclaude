@@ -63,7 +63,7 @@ Trigger::~Trigger() {
 void Trigger::onButtonPressed(
     SystemMediaTransportControls const&,
     SystemMediaTransportControlsButtonPressedEventArgs const& args) {
-    auto button = args.Button();
+    const auto button = args.Button();
     if (button != SystemMediaTransportControlsButton::Play &&
         button != SystemMediaTransportControlsButton::Pause) {
         return;
@@ -79,7 +79,7 @@ void Trigger::run() {
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
     threadId_ = GetCurrentThreadId();
 
-    std::vector<uint8_t> wavBytes = buildSilentWav();
+    const std::vector<uint8_t> wavBytes = buildSilentWav();
 
     InMemoryRandomAccessStream stream;
     DataWriter writer(stream);

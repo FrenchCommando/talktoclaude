@@ -3,9 +3,13 @@ REM Everything except installing Visual Studio Build Tools (you're doing that
 REM yourself). Run this after the C++ workload finishes installing.
 REM
 REM Locates the MSVC toolchain itself (via vswhere + vcvarsall.bat) so this
-REM works from a plain cmd/PowerShell session — no need to open a special
-REM "Developer Command Prompt". Then configures + builds, and fetches a
-REM whisper model if missing.
+REM works from a plain cmd session — no need to open a special "Developer
+REM Command Prompt". Then configures + builds, and fetches a whisper model
+REM if missing.
+REM
+REM Pure cmd on purpose. cmd has no tee, so the noisy steps write their full
+REM output to the log rather than the console; on failure the error lines are
+REM pulled back out of it. Progress is reported by the === milestones ===.
 
 setlocal enabledelayedexpansion
 
@@ -14,11 +18,11 @@ REM moment we exit, taking all the output with it — pause at the end instead.
 set DOUBLECLICKED=
 echo %cmdcmdline% | find /i "%~f0" >nul && set DOUBLECLICKED=1
 
-REM build\ gets deleted at the end, so the configure/build output is teed into
-REM a timestamped file under logs\ (gitignored) that outlives it.
+REM build\ gets deleted at the end, so the configure/build output goes to a
+REM timestamped file under logs\ (gitignored) that outlives it.
 set LOGDIR=%~dp0logs
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"
-for /f "usebackq tokens=*" %%i in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"`) do set STAMP=%%i
+call :stamp
 set LOG=%LOGDIR%\setup-%STAMP%.log
 echo Logging to %LOG%
 
@@ -40,22 +44,29 @@ if not defined VSINSTALL (
 
 echo Found VS install: %VSINSTALL%
 
+REM Deliberately not redirected into %LOG%: vcvarsall leaves something holding
+REM the redirected file open after it returns, and the next append then fails
+REM with a sharing violation. Its banner is five lines, so console is fine.
 call "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" x64
 if %ERRORLEVEL% neq 0 goto :fail
 
-REM Work from the repo root and pass the generator via the environment: the
-REM :tee helper hands its command line to PowerShell, which eats embedded
-REM double quotes, so the teed commands have to be quote-free.
-cd /d "%~dp0"
-set CMAKE_GENERATOR=NMake Makefiles
-
 echo === Configuring ===
-call :tee cmake -B build -S .
+cmake -B build -S "%~dp0." -G "NMake Makefiles" >> "%LOG%" 2>&1
 if %ERRORLEVEL% neq 0 goto :fail
+REM A redirect that can't open the log leaves ERRORLEVEL at 0 while the
+REM command never runs, so check for what the step was supposed to produce.
+if not exist "%~dp0build\CMakeCache.txt" (
+    echo Configure produced no build\CMakeCache.txt.
+    goto :fail
+)
 
-echo === Building ===
-call :tee cmake --build build
+echo === Building ^(a few minutes; watch %LOG% if you want detail^) ===
+cmake --build build >> "%LOG%" 2>&1
 if %ERRORLEVEL% neq 0 goto :fail
+if not exist "%~dp0build\talktoclaude.exe" (
+    echo Build produced no build\talktoclaude.exe.
+    goto :fail
+)
 
 if not exist "%~dp0models" mkdir "%~dp0models"
 if not exist "%~dp0models\ggml-base.en.bin" (
@@ -63,7 +74,8 @@ if not exist "%~dp0models\ggml-base.en.bin" (
     REM whisper.cpp's own download-ggml-model.cmd: that one uses BITS, which
     REM refuses to start on a metered or "no active connection" adapter and
     REM then reports success anyway. It also lives under build\, which we
-    REM delete.
+    REM delete. Not redirected — curl's progress bar is the one thing worth
+    REM watching live, since it's 142 MB.
     echo === Fetching base.en model ===
     curl.exe -L -f -o "%~dp0models\ggml-base.en.bin" https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
 )
@@ -100,20 +112,37 @@ exit /b 0
 
 :fail
 echo.
-echo Setup failed — see errors above.
+echo Setup failed. Error lines from the log:
+echo.
+if exist "%LOG%" findstr /i /c:"error" /c:"fatal" "%LOG%"
+echo.
 if defined LOG echo Full output: %LOG%
 if defined DOUBLECLICKED pause
 exit /b 1
 
-REM Runs its arguments as a command, showing output on the console and
-REM appending it to %LOG%, and propagates the command's exit code (a plain
-REM `| powershell` pipe would report PowerShell's instead).
-REM Not Tee-Object: in Windows PowerShell it writes UTF-16 and it would keep
-REM stderr lines wrapped as ErrorRecords, complete with PowerShell's own
-REM "Au caractere Ligne:1" framing. Flattening each line by hand avoids both.
-REM One StreamWriter held open for the whole pipeline, not Add-Content per
-REM line: reopening the file thousands of times loses lines to sharing
-REM violations whenever something else (an indexer, AV) has it open.
-:tee
-powershell -NoProfile -Command "$w = [IO.StreamWriter]::new($env:LOG, $true); & cmd /c '%*' 2>&1 | ForEach-Object { $line = $_.ToString(); Write-Host $line; $w.WriteLine($line) }; $w.Close(); exit $LASTEXITCODE"
-exit /b %ERRORLEVEL%
+REM Sets %STAMP% to a sortable YYYYMMDD-HHMMSS. %DATE%/%TIME% are the only
+REM clock cmd has (wmic is gone from Windows 11 26200), and both are
+REM locale-shaped: here they read 30/08/2026 and 14:16:49,37. Day-name
+REM prefixes are dropped, and a leading 4-digit token is taken as a
+REM year-first locale; otherwise day-before-month is assumed, which is what
+REM this machine uses.
+:stamp
+set _d=%DATE%
+set _t=%TIME%
+for /f "tokens=1-4 delims=/-. " %%a in ("%_d%") do (
+    set _p1=%%a& set _p2=%%b& set _p3=%%c& set _p4=%%d
+)
+if defined _p4 (
+    set _p1=!_p2!& set _p2=!_p3!& set _p3=!_p4!
+)
+if "!_p1:~3,1!"=="" (
+    set _yyyy=!_p3!& set _mm=!_p2!& set _dd=!_p1!
+) else (
+    set _yyyy=!_p1!& set _mm=!_p2!& set _dd=!_p3!
+)
+for /f "tokens=1-3 delims=:,." %%a in ("%_t%") do (
+    set _hh=0%%a& set _mi=%%b& set _ss=%%c
+)
+set _hh=!_hh:~-2!
+set STAMP=!_yyyy!!_mm!!_dd!-!_hh!!_mi!!_ss!
+exit /b 0

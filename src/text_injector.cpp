@@ -10,8 +10,8 @@ namespace TextInjector {
 void typeText(const std::string& utf8Text) {
     if (utf8Text.empty()) return;
 
-    int wideLen = MultiByteToWideChar(CP_UTF8, 0, utf8Text.c_str(),
-                                       static_cast<int>(utf8Text.size()), nullptr, 0);
+    const int wideLen = MultiByteToWideChar(CP_UTF8, 0, utf8Text.c_str(),
+                                            static_cast<int>(utf8Text.size()), nullptr, 0);
     if (wideLen <= 0) return;
     std::wstring wide(wideLen, L'\0');
     MultiByteToWideChar(CP_UTF8, 0, utf8Text.c_str(), static_cast<int>(utf8Text.size()),
