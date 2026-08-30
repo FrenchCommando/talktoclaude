@@ -13,7 +13,9 @@ it submits on its own.
 - **STT**: `whisper.cpp`, linked in directly (not shelled out to), `base.en`
   model.
 - **Audio capture**: WASAPI (native Win32/COM), captures mic while armed.
-- **Trigger**: Google Pixel Buds paired over Bluetooth AVRCP. AVRCP
+- **Trigger**: Google Pixel Buds paired over Bluetooth AVRCP. The session
+  claim is contested — see the media-button edge case under Known rough
+  edges. AVRCP
   play/pause does **not** surface as a `WH_KEYBOARD_LL` keyboard event on
   this system — confirmed by testing: a real keyboard's media key does show
   up as `VK_MEDIA_PLAY_PAUSE` there, the earbuds' AVRCP press does not, and
@@ -118,6 +120,30 @@ necessarily before pressing start).
   transcribes+types on stop.
 
 ## Known rough edges (not blocking, revisit if annoying)
+
+- **Another app that is actively playing keeps the media button** (the
+  YouTube case). Windows arbitrates the SMTC "now playing" session and there
+  is no API to ask who owns it, nor any way to force it. Observed: with a
+  video playing, the first buds press goes to *it* (pausing the video), and
+  only then does talktoclaude get the button. So dictating while something
+  plays costs one throwaway press.
+
+  What's in place: `trigger.cpp` re-claims the session every 3s
+  (`kReclaimIntervalMs`) by tearing down the `MediaPlayer` and building a new
+  one — a pause/play pair on the existing player coalesces into no state
+  transition, so Windows never sees a new "started playing". Volume is
+  0.001 rather than 0.0 on the theory that a truly silent session is skipped
+  when routing hardware buttons. Ctrl+Alt+V forces a re-claim.
+
+  **This is an accepted edge case, not a solved problem.** The recreate-based
+  re-claim was never confirmed to beat an actively-playing app; we stopped
+  digging. If it matters later, the untried lever is
+  `GlobalSystemMediaTransportControlsSessionManager` (Windows.Media.Control),
+  which can report the *current* session — that would at least turn a blind
+  3s re-claim into "re-claim only when we've actually lost it".
+
+  Note the whole approach is inherently a fight over one button: while
+  talktoclaude runs it wants the button, so the buds can't pause YouTube.
 
 - Transcription latency is ~3.5s for short utterances, roughly flat. Whisper's
   encoder runs a fixed 30s mel window, so a 4s sentence used to pay a 30s

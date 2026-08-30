@@ -82,6 +82,13 @@ Each run writes `logs/talktoclaude-<timestamp>.log` (gitignored) with
 everything the console shows plus whisper's own diagnostics; `setup.bat`
 leaves its build output in `logs/setup-<timestamp>.log` the same way.
 
+Known edge case: if something else is actively playing (a YouTube tab, say),
+Windows gives it the media button, and the first press pauses *that* instead
+of starting dictation — press again and dictation works. talktoclaude
+re-claims the button every 3 seconds and Ctrl+Alt+V forces it, but neither
+reliably beats an app that is already playing. Conversely, while talktoclaude
+runs the buds can't pause your video: one button, two claimants.
+
 Pair your earbuds over Bluetooth, focus the window you want text typed into,
 press play/pause to start talking, press again to stop — the transcript
 gets typed in. A keyboard's media Play/Pause key works too, for testing

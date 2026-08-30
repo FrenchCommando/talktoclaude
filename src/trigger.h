@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <winrt/Windows.Media.h>
 #include <winrt/Windows.Media.Playback.h>
+#include <winrt/Windows.Storage.Streams.h>
 
 // Listens for the media Play/Pause button via the System Media Transport
 // Controls (SMTC) API. This is the layer a paired Bluetooth device's
@@ -16,6 +18,16 @@
 // whichever app currently owns that role (e.g. a video player). We do that
 // by pointing a MediaPlayer at a silent looping WAV and marking the SMTC
 // PlaybackStatus as Playing.
+//
+// That claim is not permanent: Windows hands the session to whichever app
+// most recently *started* playing, so anything else that plays (a YouTube
+// tab, Spotify) takes the button away and our silent loop — playing
+// continuously since startup, never restarting — doesn't get it back. There
+// is no API to ask who owns the session, and focus has nothing to do with
+// it. So the silent playback is restarted on a timer, unconditionally, which
+// keeps the button with this app for as long as it runs — the deliberate cost
+// being that the buds can't control anything else meanwhile. Ctrl+Alt+V
+// forces a re-claim immediately. See kReclaimInterval in trigger.cpp.
 //
 // Each press toggles recording; the callback is invoked with `true` to mean
 // "start" and `false` to mean "stop".
@@ -34,13 +46,29 @@ public:
 
     void stop();
 
+    // Re-claims the SMTC session after another app has taken it. Called on a
+    // timer while running, and by a global hotkey. `announce` logs to the
+    // console as well as the file. Safe to call at any time.
+    void reclaim(bool announce);
+
 private:
     ToggleCallback callback_;
     bool recording_ = false;
     unsigned long threadId_ = 0;
+    // SetTimer with a null window ignores the id you give it and returns a
+    // generated one, which is what WM_TIMER's wParam carries. Spelled as
+    // uintptr_t rather than UINT_PTR so this header stays free of windows.h,
+    // the same reason threadId_ above is a plain unsigned long.
+    std::uintptr_t reclaimTimerId_ = 0;
 
     winrt::Windows::Media::Playback::MediaPlayer mediaPlayer_{nullptr};
+    winrt::Windows::Storage::Streams::InMemoryRandomAccessStream wavStream_{nullptr};
     winrt::event_token buttonPressedToken_{};
+
+    // A re-claim tears the player down and builds a new one; the silent WAV
+    // stream outlives both.
+    void startSession();
+    void endSession();
 
     void onButtonPressed(
         winrt::Windows::Media::SystemMediaTransportControls const& sender,

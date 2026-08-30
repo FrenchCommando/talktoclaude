@@ -10,6 +10,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 
+#include "logging.h"
+
 using namespace winrt;
 using namespace winrt::Windows::Media;
 using namespace winrt::Windows::Media::Core;
@@ -17,6 +19,17 @@ using namespace winrt::Windows::Media::Playback;
 using namespace winrt::Windows::Storage::Streams;
 
 namespace {
+
+// Ctrl+Alt+V re-claims the SMTC session when another app has taken the media
+// button. Registered process-wide, so it works whatever has focus.
+constexpr int kReclaimHotkeyId = 1;
+constexpr UINT kReclaimHotkeyMods = MOD_CONTROL | MOD_ALT | MOD_NOREPEAT;
+constexpr UINT kReclaimHotkeyVk = 'V';
+
+// ...and it's re-claimed on a timer anyway, so the button belongs to this app
+// for as long as it's running. The cost is deliberate: while talktoclaude is
+// open the buds can't pause YouTube, because both can't own the session.
+constexpr UINT kReclaimIntervalMs = 3000;
 
 // A tiny (~0.1s, 8kHz mono) silent WAV, looped. Its only job is to make
 // MediaPlayer legitimately "playing" so this process claims the SMTC
@@ -89,10 +102,52 @@ void Trigger::run() {
     writer.DetachStream();
     stream.Seek(0);
 
+    wavStream_ = stream;
+    startSession();
+
+    // Thread-bound hotkey: WM_HOTKEY arrives in this loop, not a window proc.
+    if (RegisterHotKey(nullptr, kReclaimHotkeyId, kReclaimHotkeyMods, kReclaimHotkeyVk)) {
+        Log::info("Media button re-claimed every %us; Ctrl+Alt+V forces it now.\n",
+                  kReclaimIntervalMs / 1000);
+    } else {
+        Log::error("[trigger] couldn't register Ctrl+Alt+V (already taken?)\n");
+    }
+
+    reclaimTimerId_ = SetTimer(nullptr, 0, kReclaimIntervalMs, nullptr);
+    if (reclaimTimerId_ == 0) Log::error("[trigger] SetTimer failed; no auto re-claim\n");
+
+    MSG msg;
+    while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+        if (msg.message == WM_HOTKEY && msg.wParam == kReclaimHotkeyId) {
+            reclaim(true);
+            continue;
+        }
+        if (msg.message == WM_TIMER && msg.wParam == reclaimTimerId_) {
+            // File only: every 3s, and the console is the dictation output.
+            reclaim(false);
+            continue;
+        }
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+
+    KillTimer(nullptr, reclaimTimerId_);
+    UnregisterHotKey(nullptr, kReclaimHotkeyId);
+    endSession();
+}
+
+// Builds a brand-new MediaPlayer and starts it playing. A fresh player is
+// what actually claims the SMTC session: pausing and re-playing the existing
+// one coalesces into no state transition at all, so Windows never sees a new
+// "started playing" and leaves the session with whatever is already playing.
+void Trigger::startSession() {
+    wavStream_.Seek(0);
     mediaPlayer_ = MediaPlayer();
-    mediaPlayer_.Source(MediaSource::CreateFromStream(stream, L"audio/wav"));
+    mediaPlayer_.Source(MediaSource::CreateFromStream(wavStream_, L"audio/wav"));
     mediaPlayer_.IsLoopingEnabled(true);
-    mediaPlayer_.Volume(0.0);
+    // Not 0.0: a silent session looks like nothing playing to Windows, and it
+    // is skipped when routing the hardware media button. Inaudible instead.
+    mediaPlayer_.Volume(0.001);
 
     auto smtc = mediaPlayer_.SystemMediaTransportControls();
     smtc.IsEnabled(true);
@@ -102,15 +157,26 @@ void Trigger::run() {
 
     mediaPlayer_.Play();
     smtc.PlaybackStatus(MediaPlaybackStatus::Playing);
+}
 
-    MSG msg;
-    while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
-    }
-
-    smtc.ButtonPressed(buttonPressedToken_);
+void Trigger::endSession() {
+    if (!mediaPlayer_) return;
+    mediaPlayer_.SystemMediaTransportControls().ButtonPressed(buttonPressedToken_);
+    buttonPressedToken_ = {};
+    mediaPlayer_.Pause();
     mediaPlayer_ = nullptr;
+}
+
+void Trigger::reclaim(bool announce) {
+    if (!wavStream_) return;
+    endSession();
+    startSession();
+    if (announce) {
+        Log::info("[media button re-claimed]\n");
+    } else {
+        // Every few seconds — only worth having when reading the log later.
+        Log::fileOnly("[media button re-claimed]\n");
+    }
 }
 
 void Trigger::stop() {
