@@ -63,11 +63,19 @@ The floor is a judgement value from whisper.cpp's `--audio-ctx` guidance, not
 something measured here. If words go missing from the end of longer
 sentences, or short ones come back garbled, raise it.
 
+`run.bat` takes an optional model path (`run.bat models\ggml-tiny.en.bin`)
+so another model can be tried without a rebuild — the path is just argv[1].
+
+Bigger isn't automatically better here: `small.en-q5_1` measured 40.9s for
+2.1s of audio, ~10x `base.en`, not the ~2x its parameter count suggests. This
+CPU has AVX2 but no VNNI, so q5_1's on-the-fly dequantization costs more than
+it saves. Measure before switching.
+
 Further levers, untried:
 
 - **Thread count** — `n_threads` is `hardware_concurrency()` (8 here) on 4
   physical cores; ggml often does no better, or worse, on hyperthreads.
-- **Smaller/quantized model** — `ggml-base.en-q5_1.bin` or `tiny.en`.
+- **`tiny.en`** — 78 MB, roughly 3x faster, at an accuracy cost.
 - **A GPU backend** — build ggml with one.
 
 Each run writes `logs/talktoclaude-<timestamp>.log` (gitignored) with

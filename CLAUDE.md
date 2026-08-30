@@ -130,8 +130,22 @@ necessarily before pressing start).
   Accuracy at that floor hasn't been properly evaluated.
 - `n_threads` is `hardware_concurrency()` (8) on 4 physical cores; never
   A/B'd against 4.
-- whisper's non-speech markers (`[ Pause ]`, `[BLANK_AUDIO]`) are typed into
-  the focused window and submitted with Enter like any other transcript.
+- Model choice is settled by measurement, not size: `small.en-q5_1` took 40.9s
+  for 2.1s of audio against `base.en`'s 3.5s — ~10x, not the ~2x that
+  parameter count suggests. `small` is 3x `base`, and q5_1's on-the-fly
+  dequantization is a penalty rather than a win on this AVX2-without-VNNI
+  i7-8550U. Its transcripts were correct but no more accurate. `base.en`
+  stands; `small.en` unquantized was never tried, which would separate the
+  size cost from the quantization cost.
+- Timings are only comparable on an otherwise idle machine. A `base.en` run
+  at `audio_ctx 335` once took 33.8s when an earlier 12.5s utterance at
+  `audio_ctx 677` took 7.7s — same binary, same model. Suspected either two
+  app instances competing (each asks for 8 threads on 4 cores) or thermal
+  throttling after repeated from-scratch whisper.cpp builds on a 15W chip.
+  Unresolved; check for a stray instance before trusting a slow number.
+- whisper's non-speech markers (`[ Pause ]`, `[silence]`, `[BLANK_AUDIO]`)
+  are typed into the focused window and submitted with Enter like any other
+  transcript.
 - No VAD/auto-stop — must press the button twice per utterance.
 - No silence trimming.
 - Single fixed language ("en") hardcoded in transcriber.cpp.
