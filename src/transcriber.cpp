@@ -1,11 +1,23 @@
 #include "transcriber.h"
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <thread>
 
 #include "logging.h"
 #include "whisper.h"
+
+namespace {
+
+// Floor for the shrunken encoder context. Unlike the other figures here this
+// one isn't derivable from the model — it's a judgement call about where
+// accuracy starts to suffer, taken from whisper.cpp's --audio-ctx guidance
+// rather than measured on this setup.
+constexpr int kMinAudioCtx = 256;
+
+}  // namespace
 
 struct Transcriber::Impl {
     whisper_context* ctx = nullptr;
@@ -51,6 +63,16 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
     const unsigned hw = std::thread::hardware_concurrency();
     wparams.n_threads = static_cast<int>(hw ? hw : 4);
 
+    // The encoder otherwise runs the model's full mel window (30s) no matter
+    // how little was said, so a 4s utterance pays a 30s encoder pass. Shrink
+    // the context to fit the actual audio, plus a second of headroom so the
+    // tail isn't clipped. Dictation is short, so this is most of the runtime.
+    const int fullCtx = whisper_model_n_audio_ctx(impl_->ctx);
+    const int ctxPerSecond = fullCtx / WHISPER_CHUNK_SIZE;
+    const double seconds = audio.size() / static_cast<double>(WHISPER_SAMPLE_RATE);
+    const int neededCtx = static_cast<int>(std::ceil(seconds * ctxPerSecond)) + ctxPerSecond;
+    wparams.audio_ctx = std::min(fullCtx, std::max(kMinAudioCtx, neededCtx));
+
     const auto t0 = std::chrono::steady_clock::now();
     const int rc =
         whisper_full(impl_->ctx, wparams, audio.data(), static_cast<int>(audio.size()));
@@ -60,9 +82,9 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
         Log::error("[transcriber] whisper_full failed\n");
         return {};
     }
-    const double seconds = audio.size() / 16000.0;
-    Log::info("[%.1fs audio in %.1fs, %.1fx realtime, %d threads]\n", seconds, elapsed,
-              elapsed > 0 ? seconds / elapsed : 0.0, wparams.n_threads);
+    Log::info("[%.1fs audio in %.1fs (%.1fx spoken length), audio_ctx %d/%d, %d threads]\n",
+              seconds, elapsed, elapsed > 0 ? seconds / elapsed : 0.0, wparams.audio_ctx,
+              fullCtx, wparams.n_threads);
 
     std::string result;
     const int nSegments = whisper_full_n_segments(impl_->ctx);

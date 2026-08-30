@@ -42,31 +42,31 @@ Measured on the dev machine (i7-8550U, 4 cores / 8 threads, AVX2, no
 AVX-512; CPU only — this build has no GPU backend):
 
 ```
-[3.8s audio in 18.1s, 0.2x realtime, 8 threads]
-[3.2s audio in 16.5s, 0.2x realtime, 8 threads]
-[4.2s audio in 18.4s, 0.2x realtime, 8 threads]
+[3.8s audio in 18.1s (0.2x spoken length), audio_ctx 1500/1500]   before
+[3.7s audio in  3.3s (1.1x spoken length), audio_ctx  256/1500]   after
+[2.1s audio in  3.5s (0.6x spoken length), audio_ctx  256/1500]
 ```
 
-Read that `0.2x` carefully — the denominator is what you *said*, but it is
-not what whisper *processed*. Whisper's encoder runs over a fixed 30-second
-mel window (`n_audio_ctx = 1500`), zero-padded, so a 4-second utterance costs
-the same encoder pass as a 30-second one. Against the real 30s window those
-runs are ~1.8x realtime, which is ordinary for `base.en` on this CPU. Nothing
-is malfunctioning; a short sentence is just paying full price.
+Whisper's encoder runs a fixed 30-second mel window, zero-padded, so a 4s
+utterance used to cost the same encoder pass as a 30s one — that's the 18.1s.
+`transcribe()` now shrinks `wparams.audio_ctx` to fit the actual audio
+(derived from `whisper_model_n_audio_ctx` / `WHISPER_CHUNK_SIZE`, plus a
+second of headroom), which is the 5.5x.
 
-So expect ~15-20 seconds between pressing stop and the text appearing, mostly
-independent of how long you spoke. Model load at startup is a further ~1.5s,
-once. Transcription is synchronous and blocks the trigger's message loop, so
-a button press during it isn't seen until it finishes.
+Anything short clamps to the `kMinAudioCtx = 256` floor, so expect a roughly
+flat ~3.5s between pressing stop and the text appearing. Model load at
+startup is a further ~1.5s, once. Transcription is synchronous and blocks the
+trigger's message loop, so a button press during it isn't seen until it
+finishes.
 
-Ways out, in order of payoff:
+The floor is a judgement value from whisper.cpp's `--audio-ctx` guidance, not
+something measured here. If words go missing from the end of longer
+sentences, or short ones come back garbled, raise it.
 
-- **`wparams.audio_ctx`** — shrink the encoder context to match the actual
-  audio instead of always encoding 30s (whisper.cpp's `--audio-ctx`). Close
-  to a linear encoder speedup for short utterances. Not implemented yet.
-- **Thread count** — `n_threads` is `hardware_concurrency()` (8 here), but
-  there are only 4 physical cores; ggml often does no better, or worse, on
-  hyperthreads. Worth an A/B.
+Further levers, untried:
+
+- **Thread count** — `n_threads` is `hardware_concurrency()` (8 here) on 4
+  physical cores; ggml often does no better, or worse, on hyperthreads.
 - **Smaller/quantized model** — `ggml-base.en-q5_1.bin` or `tiny.en`.
 - **A GPU backend** — build ggml with one.
 

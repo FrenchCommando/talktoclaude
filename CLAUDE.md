@@ -119,16 +119,19 @@ necessarily before pressing start).
 
 ## Known rough edges (not blocking, revisit if annoying)
 
-- Transcription takes ~15-20s regardless of utterance length: whisper's
-  encoder always runs a fixed 30s mel window (`n_audio_ctx = 1500`), so a 4s
-  sentence pays a 30s encoder pass. Measured 3.8s audio in 18.1s on the
-  i7-8550U — ~1.8x realtime against the padded window, which is normal for
-  `base.en` on this CPU. `wparams.audio_ctx` is the lever (whisper.cpp's
-  `--audio-ctx`); not implemented. Note the log's `Nx realtime` figure
-  divides by spoken length, not the padded window, so it reads far worse
-  than the machine is actually performing.
+- Transcription latency is ~3.5s for short utterances, roughly flat. Whisper's
+  encoder runs a fixed 30s mel window, so a 4s sentence used to pay a 30s
+  encoder pass (measured: 3.8s audio in 18.1s). `transcriber.cpp` now shrinks
+  `wparams.audio_ctx` to fit the audio — 18.1s -> 3.3s, 5.5x. Everything in
+  that calculation is derived from the loaded model
+  (`whisper_model_n_audio_ctx`, `WHISPER_CHUNK_SIZE`, `WHISPER_SAMPLE_RATE`)
+  except the `kMinAudioCtx = 256` floor, which is a judgement value from
+  whisper.cpp's `--audio-ctx` guidance and is what short utterances clamp to.
+  Accuracy at that floor hasn't been properly evaluated.
 - `n_threads` is `hardware_concurrency()` (8) on 4 physical cores; never
   A/B'd against 4.
+- whisper's non-speech markers (`[ Pause ]`, `[BLANK_AUDIO]`) are typed into
+  the focused window and submitted with Enter like any other transcript.
 - No VAD/auto-stop — must press the button twice per utterance.
 - No silence trimming.
 - Single fixed language ("en") hardcoded in transcriber.cpp.

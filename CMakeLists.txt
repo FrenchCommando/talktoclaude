@@ -31,6 +31,17 @@ set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(whisper_cpp)
 set(CMAKE_WARN_DEPRECATED ${_ttc_warn_deprecated} CACHE BOOL "" FORCE)
 
+# The only warning whisper/ggml actually emit here is C4244 (int/double ->
+# float in std::fill, whisper.cpp:1265 and :3176), and MSVC prints the whole
+# template instantiation chain with each of the 12 occurrences. It's
+# upstream's to fix and we can't act on it, so silence that one number on the
+# fetched targets — anything else they start warning about stays visible.
+foreach(_ttc_dep whisper ggml ggml-base ggml-cpu parakeet)
+    if(TARGET ${_ttc_dep})
+        target_compile_options(${_ttc_dep} PRIVATE $<$<CXX_COMPILER_ID:MSVC>:/wd4244>)
+    endif()
+endforeach()
+
 add_executable(talktoclaude
     src/main.cpp
     src/logging.cpp
