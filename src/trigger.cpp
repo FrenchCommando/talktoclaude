@@ -1,24 +1,24 @@
 #include "trigger.h"
 
 #include <cstdint>
+#include <cstdio>
 #include <string>
 #include <vector>
 
+#include <winrt/Windows.Devices.Enumeration.h>
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Media.Control.h>
-#include <winrt/Windows.Media.Core.h>
-#include <winrt/Windows.Storage.Streams.h>
+#include <winrt/Windows.Media.Devices.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <systemmediatransportcontrolsinterop.h>
 
 #include "logging.h"
 
 using namespace winrt;
 using namespace winrt::Windows::Media;
-using namespace winrt::Windows::Media::Core;
-using namespace winrt::Windows::Media::Playback;
-using namespace winrt::Windows::Storage::Streams;
 
 namespace {
 
@@ -28,51 +28,21 @@ constexpr int kReclaimHotkeyId = 1;
 constexpr UINT kReclaimHotkeyMods = MOD_CONTROL | MOD_ALT | MOD_NOREPEAT;
 constexpr UINT kReclaimHotkeyVk = 'V';
 
-// ...and it's re-claimed on a timer anyway, so the button belongs to this app
-// for as long as it's running. The cost is deliberate: while talktoclaude is
-// open the buds can't pause YouTube, because both can't own the session.
+// ...and the claim is re-asserted on a timer anyway, so the button belongs
+// to this app for as long as it's running. The cost is deliberate: while
+// talktoclaude is open the headset can't pause YouTube, because both can't
+// own the session.
 constexpr UINT kReclaimIntervalMs = 3000;
 
-// A tiny (~0.1s, 8kHz mono) silent WAV, looped. Its only job is to make
-// MediaPlayer legitimately "playing" so this process claims the SMTC
-// session and future AVRCP button presses route here instead of whatever
-// app previously owned it.
-std::vector<uint8_t> buildSilentWav() {
-    constexpr uint32_t sampleRate = 8000;
-    constexpr uint32_t numSamples = sampleRate / 10; // 0.1s
-    constexpr uint32_t dataSize = numSamples * sizeof(int16_t);
-    constexpr uint32_t riffSize = 36 + dataSize;
+// Thread message posted by requestStop() (from the capture thread's
+// auto-stop) into the trigger's message loop.
+constexpr UINT kStopRequestMessage = WM_APP + 1;
 
-    std::vector<uint8_t> wav(44 + dataSize, 0);
-    auto put = [&](size_t offset, const char* bytes, size_t n) {
-        memcpy(wav.data() + offset, bytes, n);
-    };
-    auto putU32 = [&](size_t offset, uint32_t v) { memcpy(wav.data() + offset, &v, 4); };
-    auto putU16 = [&](size_t offset, uint16_t v) { memcpy(wav.data() + offset, &v, 2); };
-
-    put(0, "RIFF", 4);
-    putU32(4, riffSize);
-    put(8, "WAVE", 4);
-    put(12, "fmt ", 4);
-    putU32(16, 16);          // fmt chunk size
-    putU16(20, 1);           // PCM
-    putU16(22, 1);           // mono
-    putU32(24, sampleRate);
-    putU32(28, sampleRate * sizeof(int16_t)); // byte rate
-    putU16(32, sizeof(int16_t));              // block align
-    putU16(34, 16);          // bits per sample
-    put(36, "data", 4);
-    putU32(40, dataSize);
-    // Remaining bytes (the actual samples) are already zero-initialized = silence.
-    return wav;
-}
-
-// Who currently owns the "now playing" session — that is, where the hardware
-// media button's press gets delivered. There's still no way to *force* the
-// session, but Windows.Media.Control can at least report it, which separates
-// the two failure modes that look identical from here: another app stole the
-// button, versus the press never reaching Windows at all (a Bluetooth headset
-// sitting in hands-free mode has no AVRCP transport to send it over).
+// Who currently owns the "now playing" session — that is, where a
+// hardware media button's press gets delivered. There's no way to *force*
+// the session, but Windows.Media.Control can report it. If this never
+// names talktoclaude, our own registration isn't landing and AVRCP presses
+// have nothing to route to — exactly the failure the interop rewrite fixed.
 std::string currentSessionOwner() {
     using namespace winrt::Windows::Media::Control;
     try {
@@ -83,6 +53,140 @@ std::string currentSessionOwner() {
     } catch (winrt::hresult_error const& error) {
         return "(query failed: " + winrt::to_string(error.message()) + ")";
     }
+}
+
+// --- press probe -----------------------------------------------------------
+// The buds expose a Bluetooth HID node (service 1124) that neither the
+// laptop nor the OnePlus has, and in hands-free mode their button may be
+// remapped from an AVRCP play/pause into a HID consumer-control or
+// call-control event — which SMTC never sees, so "zero smtc lines" does not
+// mean "zero presses sent". This probe watches the other channels: raw-input
+// HID reports on the consumer (0x0C) and telephony (0x0B) usage pages, and
+// media-range virtual keys. Deliberately narrow: ordinary typing is never
+// examined or logged.
+
+LRESULT CALLBACK probeWndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == WM_INPUT) {
+        UINT size = 0;
+        GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, nullptr, &size,
+                        sizeof(RAWINPUTHEADER));
+        std::vector<uint8_t> bytes(size);
+        if (size > 0 &&
+            GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, bytes.data(), &size,
+                            sizeof(RAWINPUTHEADER)) == size) {
+            const auto* raw = reinterpret_cast<const RAWINPUT*>(bytes.data());
+            if (raw->header.dwType == RIM_TYPEHID) {
+                const BYTE* data = raw->data.hid.bRawData;
+                const DWORD total = raw->data.hid.dwSizeHid * raw->data.hid.dwCount;
+                std::string hex;
+                for (DWORD i = 0; i < total && i < 32; ++i) {
+                    char byte[4];
+                    snprintf(byte, sizeof(byte), "%02x ", data[i]);
+                    hex += byte;
+                }
+                Log::info("[probe] HID report (%lu bytes): %s\n",
+                          static_cast<unsigned long>(total), hex.c_str());
+            }
+        }
+    }
+    return DefWindowProcW(window, message, wParam, lParam);
+}
+
+LRESULT CALLBACK probeKeyHook(int code, WPARAM wParam, LPARAM lParam) {
+    if (code == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
+        const auto* key = reinterpret_cast<const KBDLLHOOKSTRUCT*>(lParam);
+        // 0xA6-0xB7: browser/volume/media/launch keys. Nothing below this
+        // range (ordinary typing) is ever looked at.
+        if (key->vkCode >= 0xA6 && key->vkCode <= 0xB7) {
+            Log::info("[probe] media-range key: vk 0x%02lx\n",
+                      static_cast<unsigned long>(key->vkCode));
+        }
+    }
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
+// Hidden top-level window: the SMTC interop registration needs an HWND, and
+// the raw-input probe needs a sink window. Never shown.
+HWND createHiddenWindow() {
+    WNDCLASSW windowClass{};
+    windowClass.lpfnWndProc = probeWndProc;
+    windowClass.hInstance = GetModuleHandleW(nullptr);
+    windowClass.lpszClassName = L"talktoclaude_window";
+    RegisterClassW(&windowClass);
+    HWND window = CreateWindowExW(0, windowClass.lpszClassName, L"talktoclaude", WS_OVERLAPPED,
+                                  0, 0, 0, 0, nullptr, nullptr, windowClass.hInstance, nullptr);
+    if (!window) Log::error("[trigger] couldn't create hidden window\n");
+    return window;
+}
+
+void startPressProbe(HWND window) {
+    RAWINPUTDEVICE devices[] = {
+        {0x0C, 0x01, RIDEV_INPUTSINK, window},  // consumer control (media buttons)
+        {0x0B, 0x05, RIDEV_INPUTSINK, window},  // telephony headset (call controls)
+    };
+    if (RegisterRawInputDevices(devices, 2, sizeof(RAWINPUTDEVICE))) {
+        Log::info("[probe] watching consumer/telephony HID reports and media-range keys\n");
+    } else {
+        Log::error("[probe] RegisterRawInputDevices failed (0x%08lx)\n", GetLastError());
+    }
+}
+
+// --- call-control probe ----------------------------------------------------
+
+winrt::Windows::Foundation::IReference<winrt::guid> containerOf(
+    winrt::Windows::Devices::Enumeration::DeviceInformation const& device) {
+    return device.Properties()
+        .TryLookup(L"System.Devices.ContainerId")
+        .try_as<winrt::Windows::Foundation::IReference<winrt::guid>>();
+}
+
+// Container (physical device) of the default capture device, or nullptr.
+winrt::Windows::Foundation::IReference<winrt::guid> defaultCaptureContainer() {
+    using namespace winrt::Windows::Devices::Enumeration;
+    using namespace winrt::Windows::Media::Devices;
+    try {
+        const winrt::hstring captureId =
+            MediaDevice::GetDefaultAudioCaptureId(AudioDeviceRole::Default);
+        if (captureId.empty()) return nullptr;
+        const auto capture =
+            DeviceInformation::CreateFromIdAsync(captureId, {L"System.Devices.ContainerId"}).get();
+        return containerOf(capture);
+    } catch (winrt::hresult_error const&) {
+        return nullptr;
+    }
+}
+
+// CallControl.GetDefault() only looks at the *default communications
+// device*, which need not be the headset — so also try FromId on every
+// render endpoint that shares the capture device's container.
+winrt::Windows::Media::Devices::CallControl armCallControlOnCaptureContainer() {
+    using namespace winrt::Windows::Devices::Enumeration;
+    using namespace winrt::Windows::Media::Devices;
+    try {
+        const auto captureContainer = defaultCaptureContainer();
+        if (!captureContainer) return nullptr;
+        const auto renders = DeviceInformation::FindAllAsync(MediaDevice::GetAudioRenderSelector(),
+                                                             {L"System.Devices.ContainerId"})
+                                 .get();
+        for (const auto& render : renders) {
+            const auto container = containerOf(render);
+            if (!container || container.Value() != captureContainer.Value()) continue;
+            try {
+                auto control = CallControl::FromId(render.Id());
+                if (control) {
+                    Log::info("[probe] call-control armed via: %s\n",
+                              winrt::to_string(render.Name()).c_str());
+                    return control;
+                }
+            } catch (winrt::hresult_error const&) {
+                // This endpoint doesn't do call control; try the next.
+            }
+        }
+    } catch (winrt::hresult_error const& error) {
+        Log::info("[probe] call-control arming failed: %s\n",
+                  winrt::to_string(error.message()).c_str());
+    }
+    return nullptr;
 }
 
 } // namespace
@@ -118,23 +222,45 @@ void Trigger::run() {
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
     threadId_ = GetCurrentThreadId();
 
-    const std::vector<uint8_t> wavBytes = buildSilentWav();
+    HWND window = createHiddenWindow();
 
-    InMemoryRandomAccessStream stream;
-    DataWriter writer(stream);
-    writer.WriteBytes(
-        array_view<uint8_t const>(wavBytes.data(), wavBytes.data() + wavBytes.size()));
-    writer.StoreAsync().get();
-    writer.DetachStream();
-    stream.Seek(0);
+    // The canonical desktop-app SMTC registration: GetForWindow, metadata,
+    // PlaybackStatus = Playing. This is what makes GetCurrentSession()
+    // able to return us, which is what AVRCP presses route by.
+    if (window) {
+        try {
+            auto interop = winrt::get_activation_factory<SystemMediaTransportControls,
+                                                         ISystemMediaTransportControlsInterop>();
+            winrt::check_hresult(interop->GetForWindow(
+                window, winrt::guid_of<SystemMediaTransportControls>(), winrt::put_abi(smtc_)));
 
-    wavStream_ = stream;
-    startSession();
+            smtc_.IsEnabled(true);
+            smtc_.IsPlayEnabled(true);
+            smtc_.IsPauseEnabled(true);
+            // Windows only delivers buttons that are enabled. Stop costs
+            // nothing to accept and means a press arriving as Stop shows up
+            // in the log instead of being dropped before we ever see it.
+            smtc_.IsStopEnabled(true);
+            buttonPressedToken_ = smtc_.ButtonPressed({this, &Trigger::onButtonPressed});
+
+            // A session without display metadata may be ignored entirely.
+            auto updater = smtc_.DisplayUpdater();
+            updater.Type(MediaPlaybackType::Music);
+            updater.MusicProperties().Title(L"talktoclaude");
+            updater.Update();
+            smtc_.PlaybackStatus(MediaPlaybackStatus::Playing);
+            Log::info("[trigger] SMTC session registered via interop\n");
+        } catch (winrt::hresult_error const& error) {
+            Log::error("[trigger] SMTC registration failed: %s\n",
+                       winrt::to_string(error.message()).c_str());
+            smtc_ = nullptr;
+        }
+    }
     reportSessionOwner();
 
     // Thread-bound hotkey: WM_HOTKEY arrives in this loop, not a window proc.
     if (RegisterHotKey(nullptr, kReclaimHotkeyId, kReclaimHotkeyMods, kReclaimHotkeyVk)) {
-        Log::info("Media button re-claimed every %us; Ctrl+Alt+V forces it now.\n",
+        Log::info("Session re-asserted every %us; Ctrl+Alt+V forces it now.\n",
                   kReclaimIntervalMs / 1000);
     } else {
         Log::error("[trigger] couldn't register Ctrl+Alt+V (already taken?)\n");
@@ -142,6 +268,39 @@ void Trigger::run() {
 
     reclaimTimerId_ = SetTimer(nullptr, 0, kReclaimIntervalMs, nullptr);
     if (reclaimTimerId_ == 0) Log::error("[trigger] SetTimer failed; no auto re-claim\n");
+
+    // See the press-probe block at the top of this file. Note the LL key
+    // hook shares this message loop, and transcription blocks it — Windows
+    // may silently drop a hook that stalls repeatedly; acceptable for a
+    // diagnostic.
+    if (window) startPressProbe(window);
+    HHOOK probeHook = SetWindowsHookExW(WH_KEYBOARD_LL, probeKeyHook, nullptr, 0);
+
+    // Call-control probe: in hands-free mode a headset's button is a call
+    // button, not a media button — idle HFP typically maps it to "redial",
+    // in-call to "hang up". Those arrive via Windows.Media.Devices.
+    // CallControl (the Bluetooth Audio Gateway), not SMTC, not HID, not a
+    // key — and are dropped unless someone subscribes. Subscribe to
+    // everything and log. The object must outlive the message loop.
+    winrt::Windows::Media::Devices::CallControl callControl{nullptr};
+    try {
+        callControl = winrt::Windows::Media::Devices::CallControl::GetDefault();
+    } catch (winrt::hresult_error const& error) {
+        Log::info("[probe] call-control unavailable: %s\n",
+                  winrt::to_string(error.message()).c_str());
+    }
+    if (!callControl) callControl = armCallControlOnCaptureContainer();
+    if (callControl) {
+        callControl.AnswerRequested([](auto&&...) { Log::info("[probe] call-control: answer\n"); });
+        callControl.HangUpRequested([](auto&&...) { Log::info("[probe] call-control: hang-up\n"); });
+        callControl.RedialRequested([](auto&&...) { Log::info("[probe] call-control: redial\n"); });
+        callControl.KeypadPressed([](auto&&...) { Log::info("[probe] call-control: keypad\n"); });
+        callControl.AudioTransferRequested(
+            [](auto&&...) { Log::info("[probe] call-control: audio transfer\n"); });
+        Log::info("[probe] call-control armed\n");
+    } else {
+        Log::info("[probe] call-control: nothing to arm\n");
+    }
 
     MSG msg;
     while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
@@ -154,90 +313,39 @@ void Trigger::run() {
             reclaim(false);
             continue;
         }
+        if (msg.message == kStopRequestMessage) {
+            if (recording_) {
+                recording_ = false;
+                if (callback_) callback_(false);
+            }
+            continue;
+        }
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
 
+    if (probeHook) UnhookWindowsHookEx(probeHook);
     KillTimer(nullptr, reclaimTimerId_);
     UnregisterHotKey(nullptr, kReclaimHotkeyId);
-    endSession();
-}
-
-// Builds a brand-new MediaPlayer and starts it playing. A fresh player is
-// what actually claims the SMTC session: pausing and re-playing the existing
-// one coalesces into no state transition at all, so Windows never sees a new
-// "started playing" and leaves the session with whatever is already playing.
-void Trigger::startSession() {
-    wavStream_.Seek(0);
-    mediaPlayer_ = MediaPlayer();
-    mediaPlayer_.Source(MediaSource::CreateFromStream(wavStream_, L"audio/wav"));
-    mediaPlayer_.IsLoopingEnabled(true);
-    // Not 0.0: a silent session looks like nothing playing to Windows, and it
-    // is skipped when routing the hardware media button. Inaudible instead.
-    mediaPlayer_.Volume(0.001);
-
-    // The claim rests entirely on this stream actually playing, and it renders
-    // to whatever the default output is — which, with Bluetooth earbuds, can
-    // vanish underneath us when they switch profile. Failing silently here
-    // looks exactly like a dead button, so say so.
-    mediaFailedToken_ = mediaPlayer_.MediaFailed(
-        [](MediaPlayer const&, MediaPlayerFailedEventArgs const& args) {
-            Log::error("[trigger] silent stream failed: %s (0x%08lx)\n",
-                       winrt::to_string(args.ErrorMessage()).c_str(),
-                       static_cast<unsigned long>(args.ExtendedErrorCode()));
-        });
-
-    auto smtc = mediaPlayer_.SystemMediaTransportControls();
-    smtc.IsEnabled(true);
-    smtc.IsPlayEnabled(true);
-    smtc.IsPauseEnabled(true);
-    // Windows only delivers buttons that are enabled. Stop costs nothing to
-    // accept and means a press arriving as Stop shows up in the log instead of
-    // being dropped by Windows before we ever see it.
-    smtc.IsStopEnabled(true);
-    buttonPressedToken_ = smtc.ButtonPressed({this, &Trigger::onButtonPressed});
-
-    mediaPlayer_.Play();
-    smtc.PlaybackStatus(MediaPlaybackStatus::Playing);
-}
-
-void Trigger::endSession() {
-    if (!mediaPlayer_) return;
-    mediaPlayer_.SystemMediaTransportControls().ButtonPressed(buttonPressedToken_);
-    buttonPressedToken_ = {};
-    mediaPlayer_.MediaFailed(mediaFailedToken_);
-    mediaFailedToken_ = {};
-    mediaPlayer_.Pause();
-    // Dropping the reference is not enough: MediaPlayer holds the SMTC
-    // registration until it is explicitly closed, so a re-claim every 3s was
-    // leaving a growing pile of players that still claim the button but whose
-    // handlers we have already revoked. Presses routed to one of those corpses
-    // go nowhere, which is exactly the "button does nothing" symptom.
-    mediaPlayer_.Close();
-    mediaPlayer_ = nullptr;
+    if (smtc_ && buttonPressedToken_) {
+        smtc_.ButtonPressed(buttonPressedToken_);
+        buttonPressedToken_ = {};
+    }
+    if (smtc_) {
+        smtc_.IsEnabled(false);
+        smtc_ = nullptr;
+    }
+    if (window) DestroyWindow(window);
 }
 
 void Trigger::reclaim(bool announce) {
-    if (!wavStream_) return;
-
-    // Sampled before the teardown: this is the state the claim was actually in
-    // over the last interval, which is the part worth knowing. MediaPlaybackState:
-    // 0 None, 1 Opening, 2 Buffering, 3 Playing, 4 Paused.
-    if (mediaPlayer_ && mediaPlayer_.PlaybackSession()) {
-        Log::fileOnly("[trigger] silent stream state: %d\n",
-                      static_cast<int>(mediaPlayer_.PlaybackSession().PlaybackState()));
-    }
-
-    endSession();
-    startSession();
+    if (!smtc_) return;
+    // Windows gives the button to whichever session most recently started
+    // playing; re-asserting Playing keeps us that session. A no-op when
+    // nothing has taken it.
+    smtc_.PlaybackStatus(MediaPlaybackStatus::Playing);
     reportSessionOwner();
-
-    if (announce) {
-        Log::info("[media button re-claimed]\n");
-    } else {
-        // Every few seconds — only worth having when reading the log later.
-        Log::fileOnly("[media button re-claimed]\n");
-    }
+    if (announce) Log::info("[session re-asserted]\n");
 }
 
 // Logged only when it changes: unchanged it's noise every 3s, but the moment
@@ -247,6 +355,10 @@ void Trigger::reportSessionOwner() {
     if (owner == lastSessionOwner_) return;
     Log::info("[media button owned by: %s]\n", owner.c_str());
     lastSessionOwner_ = std::move(owner);
+}
+
+void Trigger::requestStop() {
+    if (threadId_ != 0) PostThreadMessageW(threadId_, kStopRequestMessage, 0, 0);
 }
 
 void Trigger::stop() {

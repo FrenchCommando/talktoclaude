@@ -27,7 +27,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Log::info("talktoclaude ready. Press Play/Pause (earbuds button or media key) to talk.\n");
+    Log::info("talktoclaude ready. Press Play/Pause to talk; recording ends itself "
+              "after ~1.5s of silence (or a second press, where the hardware delivers one).\n");
 
     Trigger trigger([&](bool starting) {
         if (starting) {
@@ -49,6 +50,11 @@ int main(int argc, char** argv) {
             TextInjector::typeText(text);
         }
     });
+
+    // The utterance ends itself: trailing silence (or the hard cap) posts a
+    // stop into the trigger's loop. No second button press is needed — and
+    // on `[DESKTOP]`'s adapter none would arrive while the mic is open.
+    capture.onUtteranceEnd([&trigger] { trigger.requestStop(); });
 
     // run() pumps a Win32 message loop and blocks; that's fine, it's our
     // whole program's job right now.

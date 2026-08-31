@@ -4,31 +4,30 @@
 #include <functional>
 #include <string>
 #include <winrt/Windows.Media.h>
-#include <winrt/Windows.Media.Playback.h>
-#include <winrt/Windows.Storage.Streams.h>
 
 // Listens for the media Play/Pause button via the System Media Transport
-// Controls (SMTC) API. This is the layer a paired Bluetooth device's
-// (e.g. Pixel Buds) AVRCP play/pause command actually goes through on
-// Windows — it does NOT surface as a WH_KEYBOARD_LL keyboard event, so a
-// keyboard hook can't see it (confirmed: a real keyboard's media key does
-// show up as VK_MEDIA_PLAY_PAUSE, the earbuds' AVRCP press does not).
+// Controls (SMTC) API. This is the layer a Bluetooth headset's AVRCP
+// play/pause command goes through on Windows — it does NOT surface as a
+// keyboard event, and it is only delivered to an app that has registered a
+// real SMTC media session. (Synthesized VK_MEDIA_PLAY_PAUSE keys are the
+// exception: they reach ButtonPressed even without a registered session,
+// which made the old implementation look healthier than it was.)
 //
-// To receive SMTC button presses we have to make this process look like an
-// active "now playing" media app — Windows otherwise routes the button to
-// whichever app currently owns that role (e.g. a video player). We do that
-// by pointing a MediaPlayer at a silent looping WAV and marking the SMTC
-// PlaybackStatus as Playing.
+// The registration is done the canonical desktop way:
+// ISystemMediaTransportControlsInterop::GetForWindow on a hidden window,
+// with display metadata and PlaybackStatus = Playing. The previous
+// implementation instead played an inaudible looping WAV through a
+// MediaPlayer to claim the session; on `[DESKTOP]` that never registered a
+// session at all (GetCurrentSession() stayed null while it "played"), so
+// AVRCP presses had nothing to route to and vanished — the silent-audio
+// hack and every workaround propping it up (volume 0.001, output pinning)
+// are gone.
 //
-// That claim is not permanent: Windows hands the session to whichever app
-// most recently *started* playing, so anything else that plays (a YouTube
-// tab, Spotify) takes the button away and our silent loop — playing
-// continuously since startup, never restarting — doesn't get it back. There
-// is no API to ask who owns the session, and focus has nothing to do with
-// it. So the silent playback is restarted on a timer, unconditionally, which
-// keeps the button with this app for as long as it runs — the deliberate cost
-// being that the buds can't control anything else meanwhile. Ctrl+Alt+V
-// forces a re-claim immediately. See kReclaimInterval in trigger.cpp.
+// Windows hands the button to whichever session most recently started
+// playing, so anything else that plays (a YouTube tab, Spotify) takes it
+// away. The status is re-asserted on a timer, and Ctrl+Alt+V forces it.
+// Deliberate cost: while talktoclaude runs it wants the button, so the
+// headset can't pause other apps' media.
 //
 // Each press toggles recording; the callback is invoked with `true` to mean
 // "start" and `false` to mean "stop".
@@ -39,18 +38,23 @@ public:
     explicit Trigger(ToggleCallback callback);
     ~Trigger();
 
-    // Starts silent playback (to claim the SMTC session) and pumps a
-    // message loop so WinRT callbacks can be dispatched. Blocks until
-    // stop() is called (from another thread) or the process receives
-    // WM_QUIT. Run this on its own thread.
+    // Registers the SMTC session and pumps a message loop so WinRT
+    // callbacks can be dispatched. Blocks until stop() is called (from
+    // another thread) or the process receives WM_QUIT.
     void run();
 
     void stop();
 
-    // Re-claims the SMTC session after another app has taken it. Called on a
-    // timer while running, and by a global hotkey. `announce` logs to the
-    // console as well as the file. Safe to call at any time.
+    // Re-asserts the SMTC session after another app has taken it. Called on
+    // a timer while running, and by a global hotkey. `announce` logs to the
+    // console as well as the file.
     void reclaim(bool announce);
+
+    // Ends the current recording as if the stop press had arrived. Safe to
+    // call from any thread (posts to the trigger thread's message loop);
+    // used by the capture side's silence auto-stop, since this hardware
+    // delivers no button press while the mic is open.
+    void requestStop();
 
 private:
     ToggleCallback callback_;
@@ -62,19 +66,13 @@ private:
     // the same reason threadId_ above is a plain unsigned long.
     std::uintptr_t reclaimTimerId_ = 0;
 
-    winrt::Windows::Media::Playback::MediaPlayer mediaPlayer_{nullptr};
-    winrt::Windows::Storage::Streams::InMemoryRandomAccessStream wavStream_{nullptr};
+    winrt::Windows::Media::SystemMediaTransportControls smtc_{nullptr};
     winrt::event_token buttonPressedToken_{};
-    winrt::event_token mediaFailedToken_{};
 
-    // Last owner reported by Windows.Media.Control, so a re-claim only logs
+    // Last owner reported by Windows.Media.Control, so the timer only logs
     // when the button actually changes hands.
     std::string lastSessionOwner_;
 
-    // A re-claim tears the player down and builds a new one; the silent WAV
-    // stream outlives both.
-    void startSession();
-    void endSession();
     void reportSessionOwner();
 
     void onButtonPressed(

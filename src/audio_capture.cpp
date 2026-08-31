@@ -25,6 +25,14 @@ namespace {
 
 constexpr int kTargetSampleRate = 16000;
 
+// Auto-stop tuning. The threshold is a judgment value: real speech through
+// the buds' HFP mic measured peak ~0.03, so 0.01 sits 3x under speech while
+// clearing the noise floor. Trailing silence and the hard cap are UX
+// choices, not measurements.
+constexpr float kSpeechThreshold = 0.01f;
+constexpr uint64_t kTrailingSilenceMs = 1500;
+constexpr uint64_t kMaxUtteranceMs = 30000;
+
 // PKEY_Device_FriendlyName and KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, spelled out
 // instead of pulled in from <functiondiscoverykeys_devpkey.h>/<ksmedia.h>:
 // those headers only *declare* the symbols unless INITGUID is defined first,
@@ -117,8 +125,36 @@ struct AudioCapture::Impl {
 
     std::thread captureThread;
     std::atomic<bool> threadShouldRun{false};
+    // True while an utterance is being kept. The capture loop also drains
+    // packets while this is false rather than letting the shared buffer
+    // overflow.
+    std::atomic<bool> capturing{false};
     std::mutex bufferMutex;
     std::vector<float> buffer;
+
+    // Auto-stop state, reset per utterance. The utterance ends on trailing
+    // silence after speech, or at the hard cap — never on a second button
+    // press, which this hardware won't deliver while the mic is open.
+    std::function<void()> utteranceEndCallback;
+    std::atomic<bool> sawSpeech{false};
+    std::atomic<bool> autoStopFired{false};
+    std::atomic<uint64_t> lastLoudMs{0};
+    std::atomic<uint64_t> recordStartMs{0};
+
+    // Runs every capture-loop iteration (packet or 200ms timeout alike), so
+    // the hard cap fires even if the stream goes dead.
+    void maybeAutoStop() {
+        if (!capturing.load() || autoStopFired.load()) return;
+        const uint64_t now = GetTickCount64();
+        const bool trailingSilence =
+            sawSpeech.load() && now - lastLoudMs.load() >= kTrailingSilenceMs;
+        const bool tooLong = now - recordStartMs.load() >= kMaxUtteranceMs;
+        if (!trailingSilence && !tooLong) return;
+        autoStopFired = true;
+        Log::info(trailingSilence ? "[auto-stop: trailing silence]\n"
+                                  : "[auto-stop: max utterance length]\n");
+        if (utteranceEndCallback) utteranceEndCallback();
+    }
 
     // Per-utterance counters. Without them "nothing was transcribed" can't be
     // told apart from "the device never delivered a packet".
@@ -140,6 +176,7 @@ struct AudioCapture::Impl {
 
         while (threadShouldRun.load()) {
             const DWORD waitResult = WaitForSingleObject(captureEvent, 200);
+            maybeAutoStop();
             if (waitResult != WAIT_OBJECT_0) continue;
 
             UINT32 packetLength = 0;
@@ -154,7 +191,7 @@ struct AudioCapture::Impl {
                     break;
                 }
 
-                if (framesAvailable > 0) {
+                if (framesAvailable > 0 && capturing.load()) {
                     std::lock_guard<std::mutex> lock(bufferMutex);
                     if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
                         silentFrames += framesAvailable;
@@ -163,6 +200,18 @@ struct AudioCapture::Impl {
                         appendResampled(buffer, reinterpret_cast<float*>(data),
                                          framesAvailable, mixFormat->nChannels,
                                          mixFormat->nSamplesPerSec);
+                        // Track speech for auto-stop; raw interleaved
+                        // samples are fine for a threshold test.
+                        const float* samples = reinterpret_cast<float*>(data);
+                        const size_t count =
+                            static_cast<size_t>(framesAvailable) * mixFormat->nChannels;
+                        for (size_t i = 0; i < count; ++i) {
+                            if (std::fabs(samples[i]) > kSpeechThreshold) {
+                                lastLoudMs = GetTickCount64();
+                                sawSpeech = true;
+                                break;
+                            }
+                        }
                     }
                     framesSeen += framesAvailable;
                 }
@@ -177,6 +226,10 @@ struct AudioCapture::Impl {
 };
 
 AudioCapture::AudioCapture() : impl_(new Impl()) {}
+
+void AudioCapture::onUtteranceEnd(std::function<void()> callback) {
+    impl_->utteranceEndCallback = std::move(callback);
+}
 
 AudioCapture::~AudioCapture() {
     if (impl_->audioClient) impl_->audioClient->Stop();
@@ -259,20 +312,26 @@ void AudioCapture::start() {
     impl_->framesSeen = 0;
     impl_->silentFrames = 0;
     lastPeak_ = 0.0f;
+    impl_->sawSpeech = false;
+    impl_->autoStopFired = false;
+    impl_->recordStartMs = GetTickCount64();
+    impl_->lastLoudMs = impl_->recordStartMs.load();
 
     const HRESULT hr = impl_->audioClient->Start();
     if (FAILED(hr)) {
         Log::error("[audio] IAudioClient::Start failed: 0x%08lx\n", hr);
         return;
     }
+    impl_->capturing = true;
     recording_ = true;
 }
 
 std::vector<float> AudioCapture::stop() {
     if (!recording_) return {};
+    impl_->capturing = false;
+    recording_ = false;
     const HRESULT hr = impl_->audioClient->Stop();
     if (FAILED(hr)) Log::error("[audio] IAudioClient::Stop failed: 0x%08lx\n", hr);
-    recording_ = false;
 
     std::lock_guard<std::mutex> lock(impl_->bufferMutex);
     std::vector<float> result = std::move(impl_->buffer);

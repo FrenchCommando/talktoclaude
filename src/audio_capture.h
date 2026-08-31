@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <vector>
 
 // Minimal WASAPI mic capture: records 16 kHz mono float32 PCM — the format
@@ -10,15 +11,29 @@ public:
     AudioCapture();
     ~AudioCapture();
 
-    // Opens the default capture device. Returns false on failure (logs to stderr).
+    // Opens the default capture device. Returns false on failure (logs to
+    // stderr). The WASAPI stream is started per-utterance (see start), NOT
+    // here: with a Bluetooth headset an open capture stream means SCO/
+    // hands-free mode, and on `[DESKTOP]`'s Realtek adapter no button press
+    // is delivered while SCO is up. The headset must sit in A2DP between
+    // utterances so the *starting* press can arrive; the utterance is then
+    // ended by silence detection (onUtteranceEnd), never by a second press.
     bool init();
 
-    // Starts recording into an internal buffer. Safe to call once per utterance.
+    // Starts the stream and begins recording. Safe to call once per
+    // utterance. Note the first ~0.5s may be silence while the Bluetooth
+    // SCO link ramps up.
     void start();
 
-    // Stops recording and returns the captured audio (16kHz mono float32).
-    // Clears the internal buffer so the object is ready for the next start().
+    // Stops recording and the stream, and returns the captured audio
+    // (16kHz mono float32). Clears the internal buffer so the object is
+    // ready for the next start().
     std::vector<float> stop();
+
+    // Called (from the capture thread) when the utterance is over: trailing
+    // silence after speech, or the hard time cap. The callee should arrange
+    // for stop() to be called on its own thread — not call it re-entrantly.
+    void onUtteranceEnd(std::function<void()> callback);
 
     bool isRecording() const { return recording_; }
 
