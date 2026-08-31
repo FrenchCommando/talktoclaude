@@ -10,15 +10,28 @@ Measurements are hardware-specific and tagged. `[DESKTOP]` = Ryzen 9 9950X3D,
 16C/32T, 61.6 GB, RX 9070 XT, Realtek RTL8922 Bluetooth. `[LAPTOP]` = retired
 i7-8550U; treat its numbers as history, not guidance.
 
-| path | state |
-|---|---|
-| synthesized `VK_MEDIA_PLAY_PAUSE` | full cycle works: both presses, capture, transcribe, type |
-| OnePlus Bullets Wireless Z button | one press seen once; never a full cycle |
-| Pixel Buds Pro 2 button | **zero presses ever**, any configuration |
+**Working end to end, verified 2026-08-30 21:27-21:30:** seven consecutive
+press → speak → auto-stop → transcribe → type cycles from the Pixel Buds
+button, then a live dictation into a Claude Code session that submitted
+itself. Transcription 0.2-0.5s per utterance (`audio_ctx 256`, 32 threads,
+`base.en`, CPU); mic peaks 0.11-0.24 against the 0.01 silence threshold.
 
-So the pipeline downstream of the button is sound; physical headset buttons
-are the unsolved part. Speed: 2.1s audio in 0.4s (`audio_ctx 256`, 32 threads,
-`base.en`, CPU). One sample.
+Two findings shaped the design that finally worked:
+1. **The old SMTC claim never registered a session on this machine.** The
+   silent-WAV `MediaPlayer` hack left `GetCurrentSession()` null, and AVRCP
+   presses (unlike keyboard media keys, which reach `ButtonPressed`
+   regardless and therefore prove nothing) are only delivered to a
+   registered session. Replaced with the canonical
+   `ISystemMediaTransportControlsInterop::GetForWindow` registration — the
+   owner readout reports `talktoclaude.exe` once that landed.
+2. **No headset press is delivered while the mic stream (SCO) is open on
+   this adapter** — across every claim mechanism, with SMTC, HID
+   consumer/telephony raw-input, media-key, and CallControl probes all
+   silent. On `[LAPTOP]`'s Intel stack presses did arrive during SCO, so
+   this is Realtek-stack behavior, not protocol. Consequence: a second
+   "stop" press can never work here, which is why recording ends itself
+   (see Design) — and the same auto-stop closes SCO so the *next* starting
+   press finds the buds back in A2DP, which is what makes the cycle repeat.
 
 **LE Audio must stay off.** Settings > Bluetooth & devices > Device settings >
 "Use LE Audio when available" — global, not per-device, needs a restart. With
@@ -28,14 +41,16 @@ audio endpoint at all; classic returns and flaps every 10-60s). With it off
 they hold `classic=[110B,110C,110E,111E,1124]` and all endpoints steady.
 `apx=0` (no `APXENUM` nodes) is how you confirm it's really off.
 
-**The buds' button reaches Windows but never us** — it pauses a YouTube video,
-so it travels the SMTC layer fine. Reported session ownership is not the
-variable: the OnePlus press and the buds' silence both happened under
-`(no session at all)`. Untested hypothesis: the silent claim stream renders to
-the *default* output device, so when that's a Bluetooth headset its endpoint
-drops out from under the claim (`src/trigger.cpp:179` predicts this). Fix
-would be pinning `MediaPlayer.AudioDevice`; zero-code test is to set the
-default output to a wired device and press.
+**Flow (since 2026-08-30): one press, then silence ends the utterance.**
+Press once (headset in A2DP — the only state a press arrives in), speak, and
+recording stops itself after ~1.5s of trailing silence or a 30s cap
+(`kSpeechThreshold`/`kTrailingSilenceMs` in audio_capture.cpp are judgment
+values; speech peaked ~0.03 on the buds' HFP mic). The mic stream opens on
+the press and closes at auto-stop, so the buds return to A2DP between
+utterances. A second press still stops early where hardware delivers one.
+Two abandoned designs are recorded in git: always-open mic (constant device
+state, but SCO up means no press ever arrives to start) and claim-output
+pinning (solved a problem the interop registration made moot).
 
 ## Design
 
@@ -44,10 +59,13 @@ default output to a wired device and press.
   float32. With LE Audio off every machine reports `16000 Hz, 1 ch` (HFP), so
   the 48k→16k resample path is effectively dead code and stays untested.
 - **Trigger**: SMTC. An AVRCP press does *not* surface as a `WH_KEYBOARD_LL`
-  event, so we make this process the "now playing" session — a silent looping
-  WAV via `MediaPlayer` — and listen for `ButtonPressed`. `MediaPlayer` is
-  recreated every 3s to re-claim, since pause/play on the existing one
-  coalesces into no state transition. Ctrl+Alt+V forces a re-claim.
+  event and is only delivered to a registered media session, so we register
+  one the canonical desktop way: `ISystemMediaTransportControlsInterop::
+  GetForWindow` on a hidden window, display metadata, `PlaybackStatus =
+  Playing`, and listen for `ButtonPressed`. Status is re-asserted every 3s
+  (anything that starts playing takes the button); Ctrl+Alt+V forces it.
+  Synthesized media *keys* reach `ButtonPressed` even without a session —
+  never use them as proof the AVRCP path works.
 - **Injection**: `SendInput` + `KEYEVENTF_UNICODE`, then `VK_RETURN`.
 
 **Injection has no target window.** Whatever has focus when transcription
@@ -112,8 +130,12 @@ programmatically without controlling focus first.
 - GPU unused: `no GPU found`, `backends = 1`. whisper.cpp is built without a
   backend, so `use gpu = 1` is inert and the RX 9070 XT idles. Vulkan supports
   AMD — probably the largest available speedup.
-- whisper's non-speech markers (`[BLANK_AUDIO]`, `[ Pause ]`) get typed and
-  submitted like any other transcript.
+- whisper's non-speech markers (`[BLANK_AUDIO]`, `[ Silence ]`) get typed and
+  submitted like any other transcript. Deliberate: a `[ Silence ]` landing in
+  the window is useful feedback that the press-and-capture path ran.
+- `base.en` accuracy on short HFP utterances is mediocre: live example,
+  "then commit and close" → "the milk and clothes" (2.6s utterance). Fuel
+  for the GPU/`small.en` re-evaluation above.
 - No VAD/auto-stop, no silence trimming, language hardcoded to "en".
 - Transcription is synchronous and blocks the SMTC loop, so a press during it
   is lost.
