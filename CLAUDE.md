@@ -90,6 +90,10 @@ programmatically without controlling focus first.
   `build/`. Re-running rebuilds whisper.cpp from scratch. Batch files here
   need CRLF — cmd.exe mis-parses LF-only.
 - `run.bat [model path]` — defaults to `models\ggml-base.en.bin`.
+- `run-small.bat` / `run-turbo.bat` — run.bat with `small.en` /
+  `large-v3-turbo`, fetching the model on first use (setup.bat only ships
+  base.en; the fetch goes to `.part` then renames, so a truncated download
+  never looks like a model).
 - Close the console or Ctrl+C to quit.
 - `logs/` (gitignored): `talktoclaude-<stamp>.log` per run, plus setup logs.
 
@@ -127,9 +131,21 @@ programmatically without controlling focus first.
 
 ## Known rough edges
 
+- `[DESKTOP]` Model comparison, measured 2026-08-30 (CPU, 32 threads, HFP
+  mic):
+  | model | speed | notes |
+  |---|---|---|
+  | base.en | 0.4s / 2.1s audio (5.4x) | mishears short utterances ("then commit and close" → "the milk and clothes") |
+  | small.en | 1.2-1.5s / ~4.5s (3.2-3.6x) | latency fine; accuracy not obviously better |
+  | large-v3-turbo | 1.5x realtime degrading to **0.3x** (18s for 5.6s) across four utterances in one run | hallucination loops on top; unusable on CPU |
+
+  No model fixed accuracy, so the common factor — the 16kHz HFP mic feed —
+  is as suspect as model size. turbo is the model to revisit *after* the
+  GPU backend exists, not before.
 - GPU unused: `no GPU found`, `backends = 1`. whisper.cpp is built without a
   backend, so `use gpu = 1` is inert and the RX 9070 XT idles. Vulkan supports
-  AMD — probably the largest available speedup.
+  AMD — probably the largest available speedup, and the precondition for
+  running anything bigger than small.en (see the model table).
 - whisper's non-speech markers (`[BLANK_AUDIO]`, `[ Silence ]`) get typed and
   submitted like any other transcript. Deliberate: a `[ Silence ]` landing in
   the window is useful feedback that the press-and-capture path ran.
