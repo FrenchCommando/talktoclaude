@@ -58,6 +58,12 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
     wparams.print_timestamps = false;
     wparams.single_segment = false;
     wparams.no_context = true;
+    // No temperature-fallback retries. On a decode whisper scores badly it
+    // re-runs at up to five higher temperatures; a 3.1s utterance sat 35s+
+    // inside whisper_full that way ([LAPTOP] 2026-08-31, retry ladder the
+    // likely mechanism) while the loop was blocked. Dictation wants the
+    // greedy answer fast — a bad transcript on screen beats a hung app.
+    wparams.temperature_inc = 0.0f;
     // whisper runs on the CPU here, and on a laptop it's the slow part of the
     // whole pipeline — use every core there is.
     const unsigned hw = std::thread::hardware_concurrency();

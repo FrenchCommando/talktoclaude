@@ -30,7 +30,10 @@
 // headset can't pause other apps' media.
 //
 // Each press toggles recording; the callback is invoked with `true` to mean
-// "start" and `false` to mean "stop".
+// "start" and `false` to mean "stop". ButtonPressed fires on a WinRT
+// threadpool thread, so presses are posted into run()'s message loop and the
+// callback always runs on the run() thread — serialized with requestStop()
+// and with however long the callback itself blocks (transcription).
 class Trigger {
 public:
     using ToggleCallback = std::function<void(bool starting)>;

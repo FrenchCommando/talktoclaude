@@ -7,8 +7,12 @@ no cloud STT. C++, single .exe, whisper.cpp linked in.
 ## Status on `[DESKTOP]` (2026-08-30)
 
 Measurements are hardware-specific and tagged. `[DESKTOP]` = Ryzen 9 9950X3D,
-16C/32T, 61.6 GB, RX 9070 XT, Realtek RTL8922 Bluetooth. `[LAPTOP]` = retired
-i7-8550U; treat its numbers as history, not guidance.
+16C/32T, 61.6 GB, RX 9070 XT, Realtek RTL8922 Bluetooth. `[LAPTOP]` =
+i7-8550U, 4C/8T — back in service 2026-08-31 after a stint as "retired":
+base.en runs ~1.0x spoken length there (vs 5.4x on `[DESKTOP]`), capture came
+from the built-in Intel SST mic array at 48 kHz stereo, and its Intel
+Bluetooth stack delivers presses during SCO where `[DESKTOP]`'s Realtek
+doesn't.
 
 **Working end to end, verified 2026-08-30 21:27-21:30:** seven consecutive
 press → speak → auto-stop → transcribe → type cycles from the Pixel Buds
@@ -56,8 +60,10 @@ pinning (solved a problem the interop registration made moot).
 
 - **STT**: whisper.cpp, `base.en`, linked directly.
 - **Capture**: WASAPI shared mode, event-driven, downmixed to 16kHz mono
-  float32. With LE Audio off every machine reports `16000 Hz, 1 ch` (HFP), so
-  the 48k→16k resample path is effectively dead code and stays untested.
+  float32. Bluetooth HFP reports `16000 Hz, 1 ch` and bypasses the resampler;
+  `[LAPTOP]`'s built-in mic array reports `48000 Hz, 2 ch`, so the 48k→16k
+  resample + stereo downmix path is live there and transcribed correctly
+  (2026-08-31) — no longer dead code.
 - **Trigger**: SMTC. An AVRCP press does *not* surface as a `WH_KEYBOARD_LL`
   event and is only delivered to a registered media session, so we register
   one the canonical desktop way: `ISystemMediaTransportControlsInterop::
@@ -155,7 +161,15 @@ programmatically without controlling focus first.
   "then commit and close" → "the milk and clothes" (2.6s utterance). Fuel
   for the GPU/`small.en` re-evaluation above.
 - No VAD/auto-stop, no silence trimming, language hardcoded to "en".
-- Transcription is synchronous and blocks the SMTC loop, so a press during it
-  is lost.
+- Transcription is synchronous and blocks the trigger's message loop, but a
+  press during it is *queued*, not lost: SMTC `ButtonPressed` fires on a
+  WinRT threadpool thread and is posted into the loop. It used to be handled
+  directly on that threadpool thread — which meant a press mid-transcription
+  ran a second `whisper_full` concurrently on the same context, and on
+  `[LAPTOP]` (2026-08-31) that hit ggml's `!isnan(sumf)` assert and killed
+  the process. The same session showed one 3.1s utterance stuck 35s+ inside
+  `whisper_full` (why the press-during-transcription window was open at
+  all); `temperature_inc = 0` now keeps whisper from retry-laddering like
+  that.
 - `n_threads` is `hardware_concurrency()` (32 here). Never A/B'd against a
   smaller value, but the 0.4s measurement suggests it isn't hurting.

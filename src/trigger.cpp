@@ -38,6 +38,14 @@ constexpr UINT kReclaimIntervalMs = 3000;
 // auto-stop) into the trigger's message loop.
 constexpr UINT kStopRequestMessage = WM_APP + 1;
 
+// Thread message posted by onButtonPressed(). SMTC's ButtonPressed fires on
+// a WinRT threadpool thread, not the message loop — handling the toggle in
+// the event handler ran capture/transcription concurrently with whatever the
+// loop was doing. Two whisper_full calls raced on one whisper_context and
+// died on ggml's NaN assert. Marshal every press here instead, so the loop
+// thread is the only one that touches capture, transcriber, and recording_.
+constexpr UINT kButtonToggleMessage = WM_APP + 2;
+
 // Who currently owns the "now playing" session — that is, where a
 // hardware media button's press gets delivered. There's no way to *force*
 // the session, but Windows.Media.Control can report it. If this never
@@ -212,8 +220,12 @@ void Trigger::onButtonPressed(
         return;
     }
 
-    recording_ = !recording_;
-    if (callback_) callback_(recording_);
+    // This handler runs on a WinRT threadpool thread. Don't toggle here —
+    // post to the message loop so presses serialize with transcription and
+    // the auto-stop path. A press that lands mid-transcription is queued and
+    // starts the next utterance once the loop is free, instead of running a
+    // second transcription concurrently (which crashed on a ggml NaN assert).
+    if (threadId_ != 0) PostThreadMessageW(threadId_, kButtonToggleMessage, 0, 0);
 }
 
 void Trigger::run() {
@@ -318,6 +330,11 @@ void Trigger::run() {
                 recording_ = false;
                 if (callback_) callback_(false);
             }
+            continue;
+        }
+        if (msg.message == kButtonToggleMessage) {
+            recording_ = !recording_;
+            if (callback_) callback_(recording_);
             continue;
         }
         TranslateMessage(&msg);
