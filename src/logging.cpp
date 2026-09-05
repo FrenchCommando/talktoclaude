@@ -26,11 +26,12 @@ std::string exeDir() {
     const size_t slash = w.find_last_of(L"\\/");
     if (slash == std::wstring::npos) return ".";
     w.resize(slash);
-    std::string out(w.size() * 2, '\0');
-    const int len = WideCharToMultiByte(CP_UTF8, 0, w.data(), static_cast<int>(w.size()),
-                                        out.data(), static_cast<int>(out.size()), nullptr,
-                                        nullptr);
-    out.resize(len < 0 ? 0 : len);
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, w.data(), static_cast<int>(w.size()),
+                                          nullptr, 0, nullptr, nullptr);
+    if (bytes <= 0) return ".";
+    std::string out(static_cast<size_t>(bytes), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, w.data(), static_cast<int>(w.size()), out.data(), bytes,
+                        nullptr, nullptr);
     return out;
 }
 
