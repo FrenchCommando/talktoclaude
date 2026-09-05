@@ -5,6 +5,12 @@
 #include <string>
 #include <vector>
 
+// Before any C++/WinRT header: get_activation_factory<..., ISystemMedia
+// TransportControlsInterop> is a classic COM interface, and winrt/base.h
+// only supports those if <unknwn.h> came first. MSVC happened to let it
+// through; clang-cl (the arm64 build) enforces the static_assert.
+#include <unknwn.h>
+
 #include <winrt/Windows.Devices.Enumeration.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Foundation.Collections.h>
