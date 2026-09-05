@@ -18,23 +18,6 @@ std::string g_path;
 // exactly when several threads are busy, which is when it's worth reading.
 std::mutex g_mutex;
 
-std::string exeDir() {
-    wchar_t buf[MAX_PATH];
-    const DWORD n = GetModuleFileNameW(nullptr, buf, MAX_PATH);
-    if (n == 0 || n == MAX_PATH) return ".";
-    std::wstring w(buf, n);
-    const size_t slash = w.find_last_of(L"\\/");
-    if (slash == std::wstring::npos) return ".";
-    w.resize(slash);
-    const int bytes = WideCharToMultiByte(CP_UTF8, 0, w.data(), static_cast<int>(w.size()),
-                                          nullptr, 0, nullptr, nullptr);
-    if (bytes <= 0) return ".";
-    std::string out(static_cast<size_t>(bytes), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, w.data(), static_cast<int>(w.size()), out.data(), bytes,
-                        nullptr, nullptr);
-    return out;
-}
-
 // Writes to the log file with a HH:MM:SS.mmm prefix. `console` gets the raw
 // line without the prefix, so the terminal keeps looking like it did.
 void emit(FILE* console, const char* fmt, va_list args) {
@@ -58,13 +41,7 @@ void emit(FILE* console, const char* fmt, va_list args) {
 
 namespace Log {
 
-bool init() {
-    // The exe lives in bin/; logs go next to it in the repo root's logs/.
-    std::string dir = exeDir() + "\\..\\logs";
-    char full[MAX_PATH];
-    if (GetFullPathNameA(dir.c_str(), MAX_PATH, full, nullptr)) dir = full;
-    CreateDirectoryA(dir.c_str(), nullptr);
-
+bool init(const std::string& dir) {
     SYSTEMTIME t;
     GetLocalTime(&t);
     char name[64];
@@ -72,7 +49,11 @@ bool init() {
              t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
     g_path = dir + name;
 
-    g_file = fopen(g_path.c_str(), "w");
+    // The path is UTF-8; fopen would take it as the ANSI code page.
+    const int wideLen = MultiByteToWideChar(CP_UTF8, 0, g_path.c_str(), -1, nullptr, 0);
+    std::wstring wide(static_cast<size_t>(wideLen > 0 ? wideLen : 1), L'\0');
+    MultiByteToWideChar(CP_UTF8, 0, g_path.c_str(), -1, wide.data(), wideLen);
+    g_file = _wfopen(wide.c_str(), L"w");
     if (!g_file) {
         g_path.clear();
         return false;

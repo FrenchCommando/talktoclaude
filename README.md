@@ -4,7 +4,27 @@ Voice dictation into whatever window has focus (Claude Code's terminal, in
 practice), triggered by the play/pause button on Bluetooth earbuds. Local
 STT via whisper.cpp — nothing leaves the machine.
 
-See `CLAUDE.md` for the design rationale.
+See `CLAUDE.md` for the design rationale. Site: https://frenchcommando.github.io/talktoclaude/
+
+## Download (Windows 11, x64 or arm64)
+
+From the [latest release](https://github.com/FrenchCommando/talktoclaude/releases/latest):
+
+- `talktoclaude-<version>-windows-<arch>-setup.exe` — per-user installer,
+  no admin. Puts the exe in `%LOCALAPPDATA%\Programs\talktoclaude`, adds it
+  to your PATH, so `talktoclaude` works from any terminal. Uninstall from
+  Settings like anything else.
+- `talktoclaude-<version>-windows-<arch>.zip` — the same files, portable.
+
+Either way the first run downloads the `base.en` model (142 MB) into
+`%LOCALAPPDATA%\talktoclaude\models`, and logs go to
+`%LOCALAPPDATA%\talktoclaude\logs`. `talktoclaude some\other\model.bin`
+uses a different model. Built by `.github/workflows/build.yml` on every
+push; a `v*` tag publishes a release.
+
+Windows only: capture, trigger, and injection are WASAPI, SMTC, and
+SendInput. A Linux or macOS build would be a port of those three, not a
+recompile.
 
 ## Build (Windows)
 

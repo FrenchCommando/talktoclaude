@@ -45,6 +45,7 @@ endforeach()
 add_executable(talktoclaude
     src/main.cpp
     src/logging.cpp
+    src/paths.cpp
     src/audio_capture.cpp
     src/trigger.cpp
     src/text_injector.cpp
@@ -62,6 +63,8 @@ target_link_libraries(talktoclaude PRIVATE
     user32      # SendInput, hooks
     winmm       # timing helpers
     windowsapp  # WinRT projection (SystemMediaTransportControls)
+    shell32     # SHGetKnownFolderPath (LocalAppData)
+    winhttp     # first-run model download
 )
 
 target_compile_definitions(talktoclaude PRIVATE UNICODE _UNICODE)

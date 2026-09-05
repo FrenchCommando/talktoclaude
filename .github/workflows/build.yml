@@ -1,0 +1,84 @@
+name: build
+
+# Builds the Windows binaries (x64 and arm64), packages each as a portable
+# zip and an Inno Setup installer, and on a v* tag attaches all four to a
+# GitHub Release. talktoclaude is Windows-only by design (WASAPI, SMTC,
+# SendInput); a port would add a job per platform here.
+
+on:
+  push:
+    branches: [master]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = if ("${{ github.ref }}" -like "refs/tags/v*") { "${{ github.ref_name }}".Substring(1) } else { "0.0.0-" + "${{ github.sha }}".Substring(0, 7) }
+          "version=$v" >> $env:GITHUB_OUTPUT
+
+      - name: MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: ${{ matrix.arch == 'arm64' && 'amd64_arm64' || 'x64' }}
+
+      - name: Configure
+        run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Stage
+        shell: pwsh
+        run: |
+          $stage = "stage\${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          Copy-Item build\talktoclaude.exe, build\*.dll $stage
+          Copy-Item README.md $stage
+          Get-ChildItem $stage | Select-Object Name, Length
+          if (-not (Test-Path "$stage\talktoclaude.exe")) { throw "no exe staged" }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path "$stage\*" -DestinationPath "dist\talktoclaude-${{ steps.ver.outputs.version }}-windows-${{ matrix.arch }}.zip"
+
+      - name: Smoke test (x64 only; the runner is x64)
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          $out = & stage\x64\talktoclaude.exe --help
+          $out
+          if ($LASTEXITCODE -ne 0 -or -not ($out -join "`n").Contains("usage:")) { throw "--help failed" }
+
+      - name: Installer
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y | Out-Null
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DArch=${{ matrix.arch }} /DSrc=..\stage\${{ matrix.arch }} /DVersion=${{ steps.ver.outputs.version }} installer\talktoclaude.iss
+          Get-ChildItem dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: talktoclaude-windows-${{ matrix.arch }}
+          path: dist/*
+          if-no-files-found: error
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

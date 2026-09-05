@@ -124,10 +124,25 @@ can't disagree.
   never looks like a model).
 - Close the console or Ctrl+C to quit.
 - `logs/` (gitignored): `talktoclaude-<stamp>.log` per run, plus setup logs.
+- **The batch files are dev tooling and don't ship.** The product is the
+  bare exe (`src/paths.cpp`): with no argument it looks for
+  `..\models\ggml-base.en.bin` when running from a checkout (recognised by
+  `..\setup.bat`), else `%LOCALAPPDATA%\talktoclaude\models`, downloading
+  it there over WinHTTP on first run; logs follow the same rule. Verified
+  2026-09-05 from a Temp folder: 148 MB fetched, model loaded, log landed in
+  LocalAppData. Don't detect the checkout by "..\logs exists" — that matched
+  `%TEMP%\logs` and put the log there.
+- **Shipping:** `.github/workflows/build.yml` builds x64 and arm64 on
+  windows-latest (Ninja, Release), zips each, and runs Inno Setup on
+  `installer/talktoclaude.iss` for a per-user installer that adds the
+  install dir to the user PATH. A `v*` tag attaches all four to a release.
+  `pages.yml` publishes `site/` (landing page with a replayed demo) to
+  GitHub Pages. arm64 is compiled cross on an x64 runner and has never been
+  run on arm64 hardware.
 
 ## Code layout
 
-**~1500 lines across six .cpp files. Read all of them before diagnosing
+**~1700 lines across seven .cpp files. Read all of them before diagnosing
 anything.** The symptom prints in one file and is caused in another: a
 doubled transcript printed by the transcriber came from silence the capture
 left on the end, a 35s stall came from what the capture handed over, and
@@ -157,6 +172,7 @@ no symptom pointed at.
   speech ("go go" → "go").
 - `src/text_injector.{h,cpp}` — see the injection warning above.
 - `src/logging.{h,cpp}` — console + file; `Log::fileOnly` for whisper's chatter.
+- `src/paths.{h,cpp}` — log dir, default model lookup, first-run download.
 - `src/main.cpp` — wires it together.
 
 ## Debugging Bluetooth

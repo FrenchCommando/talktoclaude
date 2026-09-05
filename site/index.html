@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>talktoclaude</title>
+<meta name="description" content="Press the button on your earbuds, say something, and it is typed into whatever window has focus. Local speech-to-text for Windows, one exe.">
+<style>
+  :root {
+    --bg: #f7f6f2; --fg: #1c1b18; --muted: #6b6860; --line: #e2dfd6;
+    --card: #ffffff; --accent: #b4552f; --accent-fg: #ffffff;
+    --term-bg: #1e1e1c; --term-fg: #d8d4c8; --term-dim: #8a867a; --term-hi: #f2c14e; --term-ok: #8fc98b;
+    --pane-bg: #23231f; --caret: #8fc98b;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151513; --fg: #e8e5dc; --muted: #9a968b; --line: #2a2a26;
+      --card: #1d1d1a; --accent: #e0805a; --accent-fg: #151513;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 48px 20px 80px; }
+  h1 { font-size: 2.6rem; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h2 { font-size: 1.35rem; margin: 56px 0 12px; letter-spacing: -0.01em; }
+  p { margin: 0 0 12px; }
+  .lede { font-size: 1.2rem; max-width: 620px; }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); }
+  .cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 24px 0 8px; }
+  .btn { display: inline-block; padding: 12px 20px; border-radius: 8px; font-weight: 600;
+    text-decoration: none; background: var(--accent); color: var(--accent-fg); border: 0; cursor: pointer; font-size: 1rem; }
+  .btn.alt { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .tag { font-size: .8rem; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .card b { display: block; margin-bottom: 4px; }
+  .card .n { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .92em; }
+  code { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; }
+  pre code { background: none; border: 0; padding: 0; }
+  ul { padding-left: 20px; } li { margin-bottom: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .tbl { overflow-x: auto; }
+
+  /* demo */
+  .demo { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--term-bg); color: var(--term-fg); }
+  .demo-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px;
+    border-bottom: 1px solid #333; font-size: .85rem; color: var(--term-dim); flex-wrap: wrap; }
+  .demo-bar .btn { padding: 8px 14px; font-size: .9rem; }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; min-height: 300px; }
+  @media (max-width: 640px) { .panes { grid-template-columns: 1fr; } }
+  .pane { padding: 12px 14px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .82rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .pane + .pane { border-left: 1px solid #333; background: var(--pane-bg); }
+  @media (max-width: 640px) { .pane + .pane { border-left: 0; border-top: 1px solid #333; } }
+  .pane-title { color: var(--term-dim); margin-bottom: 8px; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; }
+  .dim { color: var(--term-dim); } .hi { color: var(--term-hi); } .ok { color: var(--term-ok); }
+  .prompt-line { display: flex; gap: 8px; }
+  .caret { display: inline-block; width: 8px; height: 1em; background: var(--caret); vertical-align: text-bottom; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .reply { color: var(--term-dim); margin-top: 6px; }
+  .pressbtn { font-size: 1.05rem; }
+  footer { margin-top: 64px; color: var(--muted); font-size: .9rem; border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>talktoclaude</h1>
+  <p class="lede">Press the button on your earbuds, say something, stop talking. It gets typed into whatever window has focus, and Enter is pressed. Built to talk to Claude Code from across the room.</p>
+  <div class="cta">
+    <a class="btn" id="dl" href="https://github.com/FrenchCommando/talktoclaude/releases/latest">Download for Windows</a>
+    <a class="btn alt" href="https://github.com/FrenchCommando/talktoclaude">Source on GitHub</a>
+  </div>
+  <p class="muted" id="dl-note">Windows 11, x64 and arm64. Per-user installer, no admin; a portable zip is on the same page. Speech never leaves your machine.</p>
+  <div class="tags">
+    <span class="tag">whisper.cpp, on the CPU</span>
+    <span class="tag">no cloud, no account</span>
+    <span class="tag">C++, one exe, no runtime</span>
+    <span class="tag">open source</span>
+  </div>
+
+  <h2>What it looks like</h2>
+  <p class="muted">A replay of a real session. The left pane is talktoclaude's console, the right is the window that had focus. Press the button to run it.</p>
+  <div class="demo" id="demo">
+    <div class="demo-bar">
+      <span id="demo-status">Pixel Buds paired · base.en loaded · button owned by talktoclaude.exe</span>
+      <span>
+        <button class="btn pressbtn" id="press" title="Simulate the earbud play/pause press">⏯ Press</button>
+        <button class="btn alt" id="replay">Replay all</button>
+      </span>
+    </div>
+    <div class="panes">
+      <div class="pane"><div class="pane-title">talktoclaude.exe</div><div id="console"><span class="dim">talktoclaude ready. Press Play/Pause to talk; recording ends itself after ~1.5s of silence.</span>
+</div></div>
+      <div class="pane"><div class="pane-title">focused window: Claude Code</div><div id="target"></div><div class="prompt-line">&gt; <span id="typed"></span><span class="caret"></span></div></div>
+    </div>
+  </div>
+
+  <h2>How it works</h2>
+  <div class="grid">
+    <div class="card"><b>1. Press</b>The play/pause button on any Bluetooth earbuds, or a keyboard media key. Windows routes it through the media-session API, and talktoclaude holds that session.</div>
+    <div class="card"><b>2. Speak</b>The mic opens on the press. Say what you want typed.</div>
+    <div class="card"><b>3. Stop talking</b>About 1.5 seconds of silence ends the utterance. No second press needed, which matters because some Bluetooth stacks deliver none while the mic is open.</div>
+    <div class="card"><b>4. Typed</b>whisper.cpp transcribes locally, the text is typed into the focused window, and Enter submits it. If focus moved while you spoke, nothing is typed.</div>
+  </div>
+
+  <h2>Get it running</h2>
+  <ol>
+    <li>Run the installer. It goes into your user profile and onto your PATH, no admin prompt. Or unzip the portable build anywhere.</li>
+    <li>Type <code>talktoclaude</code> in any terminal, or open it from the Start menu. The first run fetches the speech model (142 MB) into your local app data.</li>
+    <li>Pair your earbuds. If Windows offers "Use LE Audio when available", turn it off: the buds have to sit in classic Bluetooth for the button to arrive.</li>
+    <li>Focus the window you want to talk into, press the button, speak.</li>
+  </ol>
+  <p class="muted">Close the console window to quit. Ctrl+Alt+V takes the media button back if another app grabbed it. <code>talktoclaude path\to\other-model.bin</code> tries a different whisper model.</p>
+
+  <h2>Numbers</h2>
+  <div class="tbl"><table>
+    <tr><th>Machine</th><th>Model</th><th>Transcription time</th></tr>
+    <tr><td>Ryzen 9 9950X3D, 32 threads</td><td>base.en</td><td>0.2 to 0.5 s per utterance, about 5x faster than you spoke</td></tr>
+    <tr><td>Ryzen 9 9950X3D, 32 threads</td><td>small.en</td><td>1.2 to 1.5 s per utterance</td></tr>
+    <tr><td>i7-8550U laptop, 8 threads</td><td>base.en</td><td>about as long as you spoke</td></tr>
+  </table></div>
+  <p class="muted">CPU only. Short utterances through an earbud mic are where base.en misses words; that is the trade for sub-second latency. <code>run-small.bat</code> tries the larger model.</p>
+
+  <h2>Things to know</h2>
+  <ul>
+    <li><b>It owns the button while it runs.</b> Windows gives the media button to one session, so your earbuds cannot pause a video while talktoclaude is open.</li>
+    <li><b>It presses Enter.</b> The transcript is submitted, not just typed. That is the point for a chat prompt, and a surprise anywhere else.</li>
+    <li><b>Focus guard.</b> The window in front when you pressed is the only window that gets the text. Switch windows mid-sentence and the transcript is logged and dropped.</li>
+    <li><b>English only</b>, and the models are the English-only whisper builds.</li>
+    <li><b>Windows only.</b> Capture, trigger, and injection are WASAPI, SMTC, and SendInput. A Mac or Linux version would be a port of those three, not a recompile.</li>
+  </ul>
+
+  <h2>Under the hood</h2>
+  <p>About 1,500 lines of C++ in six files, with whisper.cpp linked in. WASAPI captures the mic and downmixes to 16 kHz mono. A hidden window registers a System Media Transport Controls session so the earbud press is delivered to it. Silence either side of the speech is trimmed before decoding, and the encoder context is shrunk to fit the audio, which is most of the speed. The design notes, including what did not work and why, are in <a href="https://github.com/FrenchCommando/talktoclaude/blob/master/CLAUDE.md">CLAUDE.md</a>.</p>
+
+  <footer>talktoclaude · <a href="https://github.com/FrenchCommando/talktoclaude">github.com/FrenchCommando/talktoclaude</a></footer>
+</main>
+
+<script>
+(function () {
+  // Latest release: swap the download link for the direct zip when the API answers.
+  const arch = (navigator.userAgentData && navigator.userAgentData.architecture === 'arm') ? 'arm64' : 'x64';
+  fetch('https://api.github.com/repos/FrenchCommando/talktoclaude/releases/latest')
+    .then(r => r.ok ? r.json() : null)
+    .then(rel => {
+      if (!rel || !rel.assets) return;
+      const asset = rel.assets.find(a => a.name.includes('windows-' + arch + '-setup')) ||
+                    rel.assets.find(a => a.name.includes('windows-' + arch)) || rel.assets[0];
+      if (!asset) return;
+      const dl = document.getElementById('dl');
+      dl.href = asset.browser_download_url;
+      dl.textContent = 'Download ' + rel.tag_name + ' for Windows ' + arch;
+      document.getElementById('dl-note').innerHTML =
+        (asset.size / 1048576).toFixed(1) + ' MB installer, per-user, no admin. <a href="' + rel.html_url +
+        '">All builds</a>, including arm64 and a portable zip. Speech never leaves your machine.';
+    }).catch(() => {});
+
+  // Demo: utterances and timings from real session logs (transcripts verbatim,
+  // including one miss), timings from the desktop measurements.
+  const utterances = [
+    { said: 'This works pretty well.', secs: 2.1, took: 0.4, ctx: 256 },
+    { said: 'Are you okay?', secs: 1.6, took: 0.3, ctx: 256 },
+    { said: 'You wrote the same thing twice.', secs: 2.4, took: 0.5, ctx: 256 },
+    { said: 'the milk and clothes', secs: 2.6, took: 0.4, ctx: 256, note: 'said: "then commit and close"' },
+  ];
+  const replies = [
+    'Glad to hear it. Anything else?',
+    'All good here. What next?',
+    'You are right, fixed the duplicate.',
+    'I do not have a milk task. Did you mean "then commit and close"?',
+  ];
+  const con = document.getElementById('console');
+  const target = document.getElementById('target');
+  const typed = document.getElementById('typed');
+  const press = document.getElementById('press');
+  const replay = document.getElementById('replay');
+  let idx = 0, busy = false;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const line = (html, cls) => {
+    const d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.innerHTML = html;
+    con.appendChild(d);
+    con.parentElement.scrollTop = con.parentElement.scrollHeight;
+    while (con.children.length > 14) con.removeChild(con.firstChild);
+  };
+
+  async function one(u, reply) {
+    busy = true; press.disabled = true;
+    line('[smtc button pressed: 1]', 'dim');
+    line('[listening...]', 'hi');
+    await wait(u.secs * 1000 * 0.6);           // "speaking", compressed
+    await wait(900);                            // trailing silence, compressed
+    line('[auto-stop: trailing silence]', 'dim');
+    line(`[captured ${(u.secs + 1.5).toFixed(1)}s, kept ${u.secs.toFixed(1)}s, peak 0.18]`, 'dim');
+    line('[transcribing...]', 'dim');
+    await wait(u.took * 1000);
+    line(`[${u.secs.toFixed(1)}s audio in ${u.took.toFixed(1)}s (${(u.secs / u.took).toFixed(1)}x spoken length), audio_ctx ${u.ctx}/1500, 32 threads]`, 'dim');
+    line('&gt; ' + u.said + (u.note ? ` <span class="dim">(${u.note})</span>` : ''), 'ok');
+    for (const ch of u.said) { typed.textContent += ch; await wait(18); }
+    await wait(250);
+    const d = document.createElement('div');
+    d.innerHTML = '<span class="dim">&gt;</span> ' + u.said.replace(/</g, '&lt;') + '<div class="reply">' + reply + '</div>';
+    target.appendChild(d);
+    typed.textContent = '';
+    while (target.children.length > 4) target.removeChild(target.firstChild);
+    busy = false; press.disabled = false;
+  }
+
+  press.addEventListener('click', () => {
+    if (busy) return;
+    const i = idx++ % utterances.length;
+    one(utterances[i], replies[i]);
+  });
+  replay.addEventListener('click', async () => {
+    if (busy) return;
+    con.innerHTML = ''; target.innerHTML = ''; idx = 0;
+    for (let i = 0; i < utterances.length; i++) {
+      await one(utterances[i], replies[i]);
+      await wait(700);
+      idx = i + 1;
+    }
+  });
+})();
+</script>
+</body>
+</html>

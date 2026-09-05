@@ -1,16 +1,35 @@
 #include <string>
 
+#include <cstdio>
+#include <cstring>
+
 #include "audio_capture.h"
 #include "logging.h"
+#include "paths.h"
 #include "text_injector.h"
 #include "transcriber.h"
 #include "trigger.h"
 
 int main(int argc, char** argv) {
-    const std::string modelPath = (argc > 1) ? argv[1] : "models/ggml-base.en.bin";
+    if (argc > 1 && (std::strcmp(argv[1], "--help") == 0 || std::strcmp(argv[1], "-h") == 0)) {
+        printf("usage: talktoclaude [model.bin]\n\n"
+               "Press the Play/Pause button on a Bluetooth headset (or a keyboard media key),\n"
+               "speak, and stop; the transcript is typed into the focused window, then Enter.\n"
+               "Without an argument the base.en whisper model is used, downloaded on first run\n"
+               "into %%LOCALAPPDATA%%\\talktoclaude\\models. Logs go to the logs\\ folder next\n"
+               "to it (or the repo's logs\\ when run from a checkout). Close the window to quit.\n");
+        return 0;
+    }
 
-    Log::init();
+    Log::init(Paths::logDir());
     if (!Log::path().empty()) Log::info("Logging to %s\n", Log::path().c_str());
+
+    const std::string modelPath = (argc > 1) ? argv[1] : Paths::defaultModel();
+    if (modelPath.empty()) {
+        Log::error("No model. Pass a path to a ggml whisper model as the first argument.\n");
+        Log::close();
+        return 1;
+    }
 
     Transcriber transcriber;
     if (!transcriber.loadModel(modelPath)) {
