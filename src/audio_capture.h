@@ -37,11 +37,17 @@ public:
 
     bool isRecording() const { return recording_; }
 
-    // Loudest sample of the last stop()'d capture. Exactly 0.0 means the
-    // device handed over nothing but digital silence — a muted mic, or a
-    // Bluetooth headset whose mic endpoint isn't live — which is worth
-    // reporting differently from "whisper heard no words".
+    // Loudest sample of the last stop()'d capture; reset by start(), so it
+    // describes that utterance alone. Exactly 0.0 means the device handed
+    // over nothing but digital silence — a muted mic, or a Bluetooth headset
+    // whose mic endpoint isn't live. Below speechThreshold() means the mic
+    // worked and nobody spoke; both are worth reporting differently from
+    // "whisper heard no words".
     float lastPeak() const { return lastPeak_; }
+
+    // The peak a capture must reach to be treated as containing speech.
+    // Callers need it to decide whether a recording is worth decoding at all.
+    static float speechThreshold();
 
 private:
     struct Impl;

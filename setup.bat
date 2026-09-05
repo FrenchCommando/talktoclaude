@@ -7,19 +7,26 @@ REM works from a plain cmd session — no need to open a special "Developer
 REM Command Prompt". Then configures + builds, and fetches a whisper model
 REM if missing.
 REM
+REM Incremental by default: build\ is kept, so a source edit rebuilds in
+REM seconds instead of re-cloning and recompiling whisper.cpp (minutes).
+REM Pass `setup.bat clean` to delete build\ first and start from scratch.
+REM
 REM Pure cmd on purpose. cmd has no tee, so the noisy steps write their full
 REM output to the log rather than the console; on failure the error lines are
 REM pulled back out of it. Progress is reported by the === milestones ===.
 
 setlocal enabledelayedexpansion
 
+set CLEAN=
+if /i "%~1"=="clean" set CLEAN=1
+
 REM Launched by double-clicking from Explorer? Then cmd closes the window the
 REM moment we exit, taking all the output with it — pause at the end instead.
 set DOUBLECLICKED=
 echo %cmdcmdline% | find /i "%~f0" >nul && set DOUBLECLICKED=1
 
-REM build\ gets deleted at the end, so the configure/build output goes to a
-REM timestamped file under logs\ (gitignored) that outlives it.
+REM Configure/build output goes to a timestamped file under logs\, so a
+REM `clean` run that throws build\ away still leaves the record behind.
 set LOGDIR=%~dp0logs
 if not exist "%LOGDIR%" mkdir "%LOGDIR%"
 call :stamp
@@ -50,6 +57,11 @@ REM with a sharing violation. Its banner is five lines, so console is fine.
 call "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" x64
 if %ERRORLEVEL% neq 0 goto :fail
 
+if defined CLEAN (
+    echo === Cleaning build\ ===
+    if exist "%~dp0build" rmdir /s /q "%~dp0build"
+)
+
 echo === Configuring ===
 cmake -B build -S "%~dp0." -G "NMake Makefiles" >> "%LOG%" 2>&1
 if %ERRORLEVEL% neq 0 goto :fail
@@ -60,7 +72,7 @@ if not exist "%~dp0build\CMakeCache.txt" (
     goto :fail
 )
 
-echo === Building ^(a few minutes; watch %LOG% if you want detail^) ===
+echo === Building ^(minutes from clean, seconds otherwise; watch %LOG% for detail^) ===
 cmake --build build >> "%LOG%" 2>&1
 if %ERRORLEVEL% neq 0 goto :fail
 if not exist "%~dp0build\talktoclaude.exe" (
@@ -92,21 +104,15 @@ if %ERRORLEVEL% neq 0 goto :fail
 copy /y "%~dp0build\*.dll" "%~dp0bin\" >nul
 if %ERRORLEVEL% neq 0 goto :fail
 
-REM Everything left in build\ is intermediates (objects, CMake cache, the
-REM fetched whisper.cpp checkout). Dropping it keeps the tree small; the
-REM cost is that re-running setup.bat re-clones and rebuilds whisper.cpp.
-REM CMake's own configure log is the one thing in there worth keeping.
-if exist "%~dp0build\CMakeFiles\CMakeConfigureLog.yaml" (
-    copy /y "%~dp0build\CMakeFiles\CMakeConfigureLog.yaml" "%LOGDIR%\cmake-configure-%STAMP%.yaml" >nul
-)
-
-echo === Cleaning build artifacts ===
-rmdir /s /q "%~dp0build"
+REM build\ stays put: it holds the fetched whisper.cpp checkout and the
+REM object files, which is exactly what makes the next run fast. It is
+REM gitignored, so the only cost is disk. `setup.bat clean` wipes it.
 
 echo.
 echo === Done ===
 echo Run it with: bin\talktoclaude.exe models\ggml-base.en.bin
 echo Build log:   %LOG%
+if not defined CLEAN echo Re-run this after editing a source file; pass `clean` to rebuild from scratch.
 if defined DOUBLECLICKED pause
 exit /b 0
 

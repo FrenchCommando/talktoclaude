@@ -69,9 +69,8 @@ std::string currentSessionOwner() {
 // remapped from an AVRCP play/pause into a HID consumer-control or
 // call-control event — which SMTC never sees, so "zero smtc lines" does not
 // mean "zero presses sent". This probe watches the other channels: raw-input
-// HID reports on the consumer (0x0C) and telephony (0x0B) usage pages, and
-// media-range virtual keys. Deliberately narrow: ordinary typing is never
-// examined or logged.
+// HID reports on the consumer (0x0C) and telephony (0x0B) usage pages.
+// Deliberately narrow: ordinary typing is never examined or logged.
 
 LRESULT CALLBACK probeWndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
     if (message == WM_INPUT) {
@@ -98,19 +97,6 @@ LRESULT CALLBACK probeWndProc(HWND window, UINT message, WPARAM wParam, LPARAM l
         }
     }
     return DefWindowProcW(window, message, wParam, lParam);
-}
-
-LRESULT CALLBACK probeKeyHook(int code, WPARAM wParam, LPARAM lParam) {
-    if (code == HC_ACTION && (wParam == WM_KEYDOWN || wParam == WM_SYSKEYDOWN)) {
-        const auto* key = reinterpret_cast<const KBDLLHOOKSTRUCT*>(lParam);
-        // 0xA6-0xB7: browser/volume/media/launch keys. Nothing below this
-        // range (ordinary typing) is ever looked at.
-        if (key->vkCode >= 0xA6 && key->vkCode <= 0xB7) {
-            Log::info("[probe] media-range key: vk 0x%02lx\n",
-                      static_cast<unsigned long>(key->vkCode));
-        }
-    }
-    return CallNextHookEx(nullptr, code, wParam, lParam);
 }
 
 // Hidden top-level window: the SMTC interop registration needs an HWND, and
@@ -281,12 +267,14 @@ void Trigger::run() {
     reclaimTimerId_ = SetTimer(nullptr, 0, kReclaimIntervalMs, nullptr);
     if (reclaimTimerId_ == 0) Log::error("[trigger] SetTimer failed; no auto re-claim\n");
 
-    // See the press-probe block at the top of this file. Note the LL key
-    // hook shares this message loop, and transcription blocks it — Windows
-    // may silently drop a hook that stalls repeatedly; acceptable for a
-    // diagnostic.
+    // See the press-probe block at the top of this file. There is
+    // deliberately no WH_KEYBOARD_LL hook alongside it: an AVRCP press never
+    // reaches one (that is why this app uses SMTC at all), and a low-level
+    // hook owned by this thread is actively harmful. The system's raw input
+    // thread blocks on it, and this thread is inside the callback
+    // (transcribing, or feeding SendInput) rather than pumping messages, so
+    // every injected keystroke stalls all input until the hook times out.
     if (window) startPressProbe(window);
-    HHOOK probeHook = SetWindowsHookExW(WH_KEYBOARD_LL, probeKeyHook, nullptr, 0);
 
     // Call-control probe: in hands-free mode a headset's button is a call
     // button, not a media button — idle HFP typically maps it to "redial",
@@ -341,7 +329,6 @@ void Trigger::run() {
         DispatchMessageW(&msg);
     }
 
-    if (probeHook) UnhookWindowsHookEx(probeHook);
     KillTimer(nullptr, reclaimTimerId_);
     UnregisterHotKey(nullptr, kReclaimHotkeyId);
     if (smtc_ && buttonPressedToken_) {

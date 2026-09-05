@@ -40,6 +40,18 @@ int main(int argc, char** argv) {
                 Log::info("[no audio captured - the mic delivered silence]\n");
                 return;
             }
+            // A recording that never crossed the speech threshold is the
+            // decoder's worst input: every temperature fails the no-speech
+            // check, so it walks the whole fallback ladder to arrive at
+            // [BLANK_AUDIO]. Don't decode it. Reachable only via the paths
+            // that skip the capture's own sawSpeech test — the 30s cap and a
+            // second button press; a trailing-silence auto-stop already
+            // implies the same threshold was crossed.
+            if (capture.lastPeak() < AudioCapture::speechThreshold()) {
+                Log::info("[nothing said - peak %.4f below the %.4f speech threshold]\n",
+                          capture.lastPeak(), AudioCapture::speechThreshold());
+                return;
+            }
             Log::info("[transcribing...]\n");
             std::string text = transcriber.transcribe(audio);
             if (text.empty()) {

@@ -60,7 +60,9 @@ pinning (solved a problem the interop registration made moot).
 
 - **STT**: whisper.cpp, `base.en`, linked directly.
 - **Capture**: WASAPI shared mode, event-driven, downmixed to 16kHz mono
-  float32. Bluetooth HFP reports `16000 Hz, 1 ch` and bypasses the resampler;
+  float32. `stop()` calls `Reset()` as well as `Stop()`: `Stop()` only pauses,
+  and the capture loop drains packets on the stream event, so anything queued
+  at stop time would otherwise be appended to the *next* utterance. Bluetooth HFP reports `16000 Hz, 1 ch` and bypasses the resampler;
   `[LAPTOP]`'s built-in mic array reports `48000 Hz, 2 ch`, so the 48k→16k
   resample + stereo downmix path is live there and transcribed correctly
   (2026-08-31) — no longer dead code.
@@ -91,10 +93,14 @@ programmatically without controlling focus first.
 
 ## Running
 
-- `setup.bat` — finds VS Build Tools via `vswhere`, builds with CMake/NMake,
-  fetches the model, stages exe + whisper/ggml DLLs into `bin/`, deletes
-  `build/`. Re-running rebuilds whisper.cpp from scratch. Batch files here
-  need CRLF — cmd.exe mis-parses LF-only.
+- `setup.bat` [clean] — finds VS Build Tools via `vswhere`, builds with
+  CMake/NMake, fetches the model, stages exe + whisper/ggml DLLs into
+  `bin/`. Incremental: `build/` is kept, so a source edit rebuilds in ~30s
+  against 4m30s from scratch (measured `[DESKTOP]` 2026-09-05; most of the
+  30s is vcvarsall plus CMake reconfigure, not compilation). `setup.bat
+  clean` deletes `build/` first — needed when the whisper.cpp pin moves or
+  the toolchain changes. Batch files here need CRLF — cmd.exe mis-parses
+  LF-only.
 - `run.bat [model path]` — defaults to `models\ggml-base.en.bin`.
 - `run-small.bat` / `run-turbo.bat` — run.bat with `small.en` /
   `large-v3-turbo`, fetching the model on first use (setup.bat only ships
@@ -105,6 +111,13 @@ programmatically without controlling focus first.
 
 ## Code layout
 
+**~1500 lines across six .cpp files. Read all of them before diagnosing
+anything.** The symptom prints in one file and is caused in another: a
+doubled transcript came from a decoder parameter, a 35s stall came from
+what the capture handed over, and reading only where the output appeared
+produced four wrong answers in a row (2026-09-05) before a full read
+found the real defects — which were in files no symptom pointed at.
+
 - `CMakeLists.txt` — FetchContent whisper.cpp (pinned), links
   ole32/user32/winmm/windowsapp, copies DLLs next to the exe.
 - `src/audio_capture.{h,cpp}` — WASAPI capture. Assumes IEEE float mix format.
@@ -112,10 +125,19 @@ programmatically without controlling focus first.
   WinRT init **must** match this apartment or it throws `RPC_E_CHANGED_MODE`.
 - `src/trigger.{h,cpp}` — SMTC trigger. Accepts both `Play` and `Pause` (no
   combined enum member). Logs the button value *before* filtering, so a
-  delivered-but-unhandled press is still visible.
+  delivered-but-unhandled press is still visible. Keeps the raw-input and
+  call-control press probes; the `WH_KEYBOARD_LL` probe is gone, and must
+  not come back: the system's raw input thread blocks on a low-level hook,
+  and this thread owns one while sitting inside transcription and
+  `SendInput`, so it stalled all input for the length of every injected
+  transcript.
 - `src/transcriber.{h,cpp}` — whisper wrapper. Shrinks `wparams.audio_ctx` to
   fit the audio, which is the 5.5x win over the fixed 30s mel window; floor is
   `kMinAudioCtx = 256`, a judgement value whose accuracy was never evaluated.
+  Logs each segment with its timestamps to the log file, which is what tells
+  a doubled decode apart from someone actually saying it twice. Deliberately
+  does no dedupe — text-level "collapse the repeat" heuristics eat real
+  speech ("go go" → "go").
 - `src/text_injector.{h,cpp}` — see the injection warning above.
 - `src/logging.{h,cpp}` — console + file; `Log::fileOnly` for whisper's chatter.
 - `src/main.cpp` — wires it together.
@@ -155,21 +177,48 @@ programmatically without controlling focus first.
   AMD — probably the largest available speedup, and the precondition for
   running anything bigger than small.en (see the model table).
 - whisper's non-speech markers (`[BLANK_AUDIO]`, `[ Silence ]`) get typed and
-  submitted like any other transcript. Deliberate: a `[ Silence ]` landing in
-  the window is useful feedback that the press-and-capture path ran.
+  submitted like any other transcript. Deliberate, but rarer now: a capture
+  that never crossed `kSpeechThreshold` is dropped before the decoder and
+  reports `[nothing said - peak ...]` on the console instead, so a typed
+  marker means whisper heard *something* and made nothing of it.
 - `base.en` accuracy on short HFP utterances is mediocre: live example,
   "then commit and close" → "the milk and clothes" (2.6s utterance). Fuel
   for the GPU/`small.en` re-evaluation above.
-- No VAD/auto-stop, no silence trimming, language hardcoded to "en".
+- No silence trimming inside an utterance; language hardcoded to "en".
 - Transcription is synchronous and blocks the trigger's message loop, but a
   press during it is *queued*, not lost: SMTC `ButtonPressed` fires on a
   WinRT threadpool thread and is posted into the loop. It used to be handled
   directly on that threadpool thread — which meant a press mid-transcription
   ran a second `whisper_full` concurrently on the same context, and on
   `[LAPTOP]` (2026-08-31) that hit ggml's `!isnan(sumf)` assert and killed
-  the process. The same session showed one 3.1s utterance stuck 35s+ inside
+  the process. The same session showed one 3.1s recording stuck 35s+ inside
   `whisper_full` (why the press-during-transcription window was open at
-  all); `temperature_inc = 0` now keeps whisper from retry-laddering like
-  that.
+  all). That recording was **silence**, which is the fallback ladder's
+  pathological input: every temperature fails the no-speech check, so it
+  pays all six decodes to arrive at `[BLANK_AUDIO]`. main.cpp now drops a
+  capture whose peak never reached `kSpeechThreshold` instead of decoding
+  it. That gate only ever fires on the two paths that bypass `sawSpeech` —
+  the 30s cap, and a second button press (which `[LAPTOP]`'s Intel stack
+  delivers mid-SCO, and is how a 3.1s silent recording got stopped and sent
+  to whisper in the first place). A trailing-silence auto-stop can't reach
+  it: `sawSpeech` tests the same threshold, so that path implies speech.
+- `temperature_inc` was set to `0` for the 35s hang above and that was the
+  wrong lever: with no retry to escalate to, the entropy/logprob check can
+  reject a repetition-looped decode but not replace it, so the loop gets
+  typed — "What about this? What about this?" for one spoken phrase. It is
+  `0.4` now (temperatures 0.0/0.4/0.8, three decodes worst case), and with
+  silence gated out beforehand the ladder no longer has anything slow to
+  chew on.
+- Logging is mutexed: a line is a timestamp write plus a body write, and the
+  capture thread and trigger loop both log. Interleaving was possible but
+  never observed in a log.
+- The resampler carries its read position and last sample across packets.
+  Restarting them per packet was only lossless because 48kHz gives a ratio
+  of exactly 3; a 44.1kHz capture device would have drifted short and
+  clicked at every seam. No such device has been used here, so the current
+  code is reasoned, not measured.
+- `SendInput`'s return value is checked. It stops at the first rejected
+  event under a higher-integrity foreground window, and a silently dropped
+  transcript is indistinguishable from whisper hearing nothing.
 - `n_threads` is `hardware_concurrency()` (32 here). Never A/B'd against a
   smaller value, but the 0.4s measurement suggests it isn't hurting.

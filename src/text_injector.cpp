@@ -5,6 +5,8 @@
 
 #include <vector>
 
+#include "logging.h"
+
 namespace TextInjector {
 
 void typeText(const std::string& utf8Text) {
@@ -45,7 +47,16 @@ void typeText(const std::string& utf8Text) {
     enterUp.ki.dwFlags = KEYEVENTF_KEYUP;
     inputs.push_back(enterUp);
 
-    SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+    // SendInput is blocked wholesale by a higher-integrity foreground window
+    // (UAC prompts, some games) and stops at the first rejected event, so a
+    // short count means the transcript was typed partially or not at all.
+    // Silently losing it looks identical to whisper hearing nothing.
+    const UINT sent = SendInput(static_cast<UINT>(inputs.size()), inputs.data(), sizeof(INPUT));
+    if (sent != inputs.size()) {
+        Log::error("[inject] only %u of %zu events were accepted (0x%08lx); the focused "
+                   "window may not accept synthetic input\n",
+                   sent, inputs.size(), GetLastError());
+    }
 }
 
 } // namespace TextInjector

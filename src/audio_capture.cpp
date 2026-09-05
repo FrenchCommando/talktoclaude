@@ -65,15 +65,26 @@ bool isIeeeFloat(const WAVEFORMATEX* format) {
     return false;
 }
 
-size_t resampledFrameCount(UINT32 frames, DWORD srcRate) {
-    if (srcRate == static_cast<DWORD>(kTargetSampleRate)) return frames;
-    return static_cast<size_t>(frames / (static_cast<double>(srcRate) / kTargetSampleRate));
-}
+// Resampler state that has to survive between packets. Restarting the read
+// position at every packet boundary quantises each packet to a whole number
+// of output frames: at 48kHz the ratio is exactly 3 so nothing is lost, but
+// at 44.1kHz (2.75625) every packet drops a fraction of a frame and restarts
+// the interpolation phase, so the capture both drifts short and clicks at
+// each seam. Carrying the position and the last input sample across removes
+// both. Reset per utterance in start().
+struct ResampleState {
+    // Read position for the next output frame, relative to the start of the
+    // next packet. Negative (down to -1) means that frame interpolates
+    // between `previous` and the packet's first sample.
+    double position = 0.0;
+    float previous = 0.0f;
+};
 
 // Very small linear resampler + stereo->mono downmix. Good enough for
 // speech dictation; not audiophile-grade, doesn't need to be.
 void appendResampled(std::vector<float>& out, const float* interleaved,
-                      UINT32 frames, WORD channels, DWORD srcRate) {
+                      UINT32 frames, WORD channels, DWORD srcRate,
+                      ResampleState& state) {
     if (frames == 0) return;
 
     // Downmix to mono first.
@@ -89,18 +100,28 @@ void appendResampled(std::vector<float>& out, const float* interleaved,
         return;
     }
 
-    // Linear-interpolation resample srcRate -> 16kHz.
+    // Linear-interpolation resample srcRate -> 16kHz. `sampleAt` reads the
+    // packet with index -1 meaning the last sample of the previous one.
     const double ratio = static_cast<double>(srcRate) / kTargetSampleRate;
-    const size_t outFrames = resampledFrameCount(frames, srcRate);
-    const size_t base = out.size();
-    out.resize(base + outFrames);
-    for (size_t i = 0; i < outFrames; ++i) {
-        const double srcPos = i * ratio;
-        const size_t i0 = static_cast<size_t>(srcPos);
-        const size_t i1 = (i0 + 1 < frames) ? i0 + 1 : i0;
-        const float frac = static_cast<float>(srcPos - i0);
-        out[base + i] = mono[i0] * (1.0f - frac) + mono[i1] * frac;
+    const auto sampleAt = [&](double index) {
+        return index < 0.0 ? state.previous : mono[static_cast<size_t>(index)];
+    };
+    // An output frame needs both of its neighbours, so stop at the last
+    // position whose right-hand neighbour is still in this packet; whatever
+    // is left over carries to the next one.
+    for (double position = state.position; position < frames - 1.0; position += ratio) {
+        const double floored = std::floor(position);
+        const float frac = static_cast<float>(position - floored);
+        out.push_back(sampleAt(floored) * (1.0f - frac) + sampleAt(floored + 1.0) * frac);
+        state.position = position + ratio;
     }
+    state.position -= frames;
+    state.previous = mono[frames - 1];
+}
+
+size_t resampledFrameCount(UINT32 frames, DWORD srcRate) {
+    if (srcRate == static_cast<DWORD>(kTargetSampleRate)) return frames;
+    return static_cast<size_t>(frames / (static_cast<double>(srcRate) / kTargetSampleRate));
 }
 
 // WASAPI flags a packet SILENT rather than handing over a buffer of zeros.
@@ -131,6 +152,9 @@ struct AudioCapture::Impl {
     std::atomic<bool> capturing{false};
     std::mutex bufferMutex;
     std::vector<float> buffer;
+    // Guarded by bufferMutex: only the capture loop touches it, and only
+    // under the lock, apart from the per-utterance reset in start().
+    ResampleState resampleState;
 
     // Auto-stop state, reset per utterance. The utterance ends on trailing
     // silence after speech, or at the hard cap — never on a second button
@@ -196,10 +220,13 @@ struct AudioCapture::Impl {
                     if (flags & AUDCLNT_BUFFERFLAGS_SILENT) {
                         silentFrames += framesAvailable;
                         appendSilence(buffer, framesAvailable, mixFormat->nSamplesPerSec);
+                        // The zeros bypass the resampler, so the sample it
+                        // would interpolate from is now a zero too.
+                        resampleState.previous = 0.0f;
                     } else {
                         appendResampled(buffer, reinterpret_cast<float*>(data),
                                          framesAvailable, mixFormat->nChannels,
-                                         mixFormat->nSamplesPerSec);
+                                         mixFormat->nSamplesPerSec, resampleState);
                         // Track speech for auto-stop; raw interleaved
                         // samples are fine for a threshold test.
                         const float* samples = reinterpret_cast<float*>(data);
@@ -308,6 +335,7 @@ void AudioCapture::start() {
     {
         std::lock_guard<std::mutex> lock(impl_->bufferMutex);
         impl_->buffer.clear();
+        impl_->resampleState = {};
     }
     impl_->framesSeen = 0;
     impl_->silentFrames = 0;
@@ -326,12 +354,24 @@ void AudioCapture::start() {
     recording_ = true;
 }
 
+float AudioCapture::speechThreshold() { return kSpeechThreshold; }
+
 std::vector<float> AudioCapture::stop() {
     if (!recording_) return {};
     impl_->capturing = false;
     recording_ = false;
     const HRESULT hr = impl_->audioClient->Stop();
     if (FAILED(hr)) Log::error("[audio] IAudioClient::Stop failed: 0x%08lx\n", hr);
+
+    // Stop() pauses the stream; it does not empty the endpoint buffer. The
+    // capture loop only drains packets when the event signals, which it no
+    // longer does, so whatever was queued at this instant survives until the
+    // next Start() — and is then appended to the *next* utterance, up to the
+    // 1s buffer. Reset() drops it. It can lose the race against a packet the
+    // capture thread is still holding, so it's not guaranteed; log and carry
+    // on rather than pretending otherwise.
+    const HRESULT resetHr = impl_->audioClient->Reset();
+    if (FAILED(resetHr)) Log::fileOnly("[audio] IAudioClient::Reset failed: 0x%08lx\n", resetHr);
 
     std::lock_guard<std::mutex> lock(impl_->bufferMutex);
     std::vector<float> result = std::move(impl_->buffer);

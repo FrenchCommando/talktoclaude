@@ -17,6 +17,13 @@ namespace {
 // rather than measured on this setup.
 constexpr int kMinAudioCtx = 256;
 
+std::string trim(const std::string& text) {
+    const size_t start = text.find_first_not_of(" \t\n\r");
+    if (start == std::string::npos) return {};
+    const size_t end = text.find_last_not_of(" \t\n\r");
+    return text.substr(start, end - start + 1);
+}
+
 }  // namespace
 
 struct Transcriber::Impl {
@@ -58,12 +65,15 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
     wparams.print_timestamps = false;
     wparams.single_segment = false;
     wparams.no_context = true;
-    // No temperature-fallback retries. On a decode whisper scores badly it
-    // re-runs at up to five higher temperatures; a 3.1s utterance sat 35s+
-    // inside whisper_full that way ([LAPTOP] 2026-08-31, retry ladder the
-    // likely mechanism) while the loop was blocked. Dictation wants the
-    // greedy answer fast — a bad transcript on screen beats a hung app.
-    wparams.temperature_inc = 0.0f;
+    // Keep the temperature ladder, bounded. It is what rejects a decode that
+    // scored badly, and with it off (temperature_inc = 0) a repetition-looped
+    // decode is detected but has no retry to be replaced by, so the loop gets
+    // typed: "What about this? What about this?" for a single spoken phrase.
+    // The ladder did once cost 35s on a 3.1s recording ([LAPTOP] 2026-08-31),
+    // but that recording was silence — every temperature fails the no-speech
+    // check, so it paid all six decodes for [BLANK_AUDIO]. main.cpp no longer
+    // sends silence here. 0.4 caps the rest at three decodes (0.0/0.4/0.8).
+    wparams.temperature_inc = 0.4f;
     // whisper runs on the CPU here, and on a laptop it's the slow part of the
     // whole pipeline — use every core there is.
     const unsigned hw = std::thread::hardware_concurrency();
@@ -95,12 +105,19 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
     std::string result;
     const int nSegments = whisper_full_n_segments(impl_->ctx);
     for (int i = 0; i < nSegments; ++i) {
-        result += whisper_full_get_segment_text(impl_->ctx, i);
+        const std::string segment = trim(whisper_full_get_segment_text(impl_->ctx, i));
+        // Segment timestamps go to the log file only; they are what tells a
+        // doubled decode apart from someone actually saying it twice, and
+        // there is no dedupe here — a repeat that reaches this point is a
+        // decode worth investigating, not one to paper over.
+        Log::fileOnly("[transcriber] segment %d [%lld..%lld] %s\n", i,
+                      static_cast<long long>(whisper_full_get_segment_t0(impl_->ctx, i)),
+                      static_cast<long long>(whisper_full_get_segment_t1(impl_->ctx, i)),
+                      segment.c_str());
+        if (segment.empty()) continue;
+        if (!result.empty()) result += ' ';
+        result += segment;
     }
 
-    // Trim leading/trailing whitespace whisper tends to emit.
-    const size_t start = result.find_first_not_of(" \t\n\r");
-    const size_t end = result.find_last_not_of(" \t\n\r");
-    if (start == std::string::npos) return {};
-    return result.substr(start, end - start + 1);
+    return result;
 }

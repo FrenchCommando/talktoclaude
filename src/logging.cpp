@@ -4,11 +4,19 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <mutex>
 
 namespace {
 
 FILE* g_file = nullptr;
 std::string g_path;
+
+// The capture thread, the trigger's message loop, and whisper's worker
+// threads all log. fprintf locks per-call, so nothing corrupts, but a line
+// here is a timestamp prefix plus a body in two calls — without this those
+// two interleave with another thread's and the log stops being readable
+// exactly when several threads are busy, which is when it's worth reading.
+std::mutex g_mutex;
 
 std::string exeDir() {
     wchar_t buf[MAX_PATH];
@@ -29,6 +37,7 @@ std::string exeDir() {
 // Writes to the log file with a HH:MM:SS.mmm prefix. `console` gets the raw
 // line without the prefix, so the terminal keeps looking like it did.
 void emit(FILE* console, const char* fmt, va_list args) {
+    const std::lock_guard<std::mutex> lock(g_mutex);
     if (console) {
         va_list copy;
         va_copy(copy, args);
