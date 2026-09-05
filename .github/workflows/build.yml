@@ -39,11 +39,13 @@ jobs:
 
       # Cross-compiling arm64 on an x64 runner: CMake takes the host as the
       # target processor unless told, and ggml then compiles its x86 kernels
-      # for an ARM64 link (LNK2005/LNK2019 on ggml_gemv_*). Declare it.
+      # for an ARM64 link (LNK2005/LNK2019 on ggml_gemv_*). Declare it. ggml
+      # also refuses MSVC for ARM ("use clang"), so use the clang-cl that
+      # ships with Visual Studio, targeting arm64.
       - name: Configure
         run: >
           cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
-          ${{ matrix.arch == 'arm64' && '-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DGGML_NATIVE=OFF' || '' }}
+          ${{ matrix.arch == 'arm64' && '-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DGGML_NATIVE=OFF -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_FLAGS=--target=arm64-pc-windows-msvc -DCMAKE_CXX_FLAGS=--target=arm64-pc-windows-msvc' || '' }}
 
       - name: Build
         run: cmake --build build
