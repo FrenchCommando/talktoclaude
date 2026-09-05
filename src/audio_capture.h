@@ -26,8 +26,11 @@ public:
     void start();
 
     // Stops recording and the stream, and returns the captured audio
-    // (16kHz mono float32). Clears the internal buffer so the object is
-    // ready for the next start().
+    // (16kHz mono float32), with the silence either side of the speech
+    // trimmed off — the trailing silence the auto-stop waits out is a decode
+    // window of its own to whisper, and it fills that window by repeating
+    // the sentence it just decoded. Clears the internal buffer so the object
+    // is ready for the next start().
     std::vector<float> stop();
 
     // Called (from the capture thread) when the utterance is over: trailing

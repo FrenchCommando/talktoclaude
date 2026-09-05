@@ -60,9 +60,12 @@ pinning (solved a problem the interop registration made moot).
 
 - **STT**: whisper.cpp, `base.en`, linked directly.
 - **Capture**: WASAPI shared mode, event-driven, downmixed to 16kHz mono
-  float32. `stop()` calls `Reset()` as well as `Stop()`: `Stop()` only pauses,
-  and the capture loop drains packets on the stream event, so anything queued
-  at stop time would otherwise be appended to the *next* utterance. Bluetooth HFP reports `16000 Hz, 1 ch` and bypasses the resampler;
+  float32. `stop()` trims the silence either side of the speech (keeping
+  300ms/250ms) before handing the audio over — see the doubled-transcript
+  note under Known rough edges. It also calls `Reset()` as well as `Stop()`:
+  `Stop()` only pauses, and the capture loop drains packets on the stream
+  event, so anything queued at stop time would otherwise be appended to the
+  *next* utterance. Bluetooth HFP reports `16000 Hz, 1 ch` and bypasses the resampler;
   `[LAPTOP]`'s built-in mic array reports `48000 Hz, 2 ch`, so the 48k→16k
   resample + stereo downmix path is live there and transcribed correctly
   (2026-08-31) — no longer dead code.
@@ -93,6 +96,15 @@ programmatically without controlling focus first.
 
 ## Running
 
+- **Close the running app before building — but say so first.** Windows
+  holds an exclusive lock on a running .exe, so the link step fails against
+  `bin/talktoclaude.exe` while it is up: `tasklist | grep -i talktoclaude`,
+  then `taskkill //PID <pid> //F`, as the first step of a build rather than
+  after it errors out. Martial dictates *with this app*, so a kill
+  interrupts him mid-utterance. Killing it is covered only by the build he
+  just asked for; a rebuild that was your own idea needs a fresh "closing
+  the app to rebuild" first. Never kill a second instance he started after
+  the build you were asked for (2026-09-05: did exactly that, mid-use).
 - `setup.bat` [clean] — finds VS Build Tools via `vswhere`, builds with
   CMake/NMake, fetches the model, stages exe + whisper/ggml DLLs into
   `bin/`. Incremental: `build/` is kept, so a source edit rebuilds in ~30s
@@ -202,6 +214,18 @@ found the real defects — which were in files no symptom pointed at.
   delivers mid-SCO, and is how a 3.1s silent recording got stopped and sent
   to whisper in the first place). A trailing-silence auto-stop can't reach
   it: `sawSpeech` tests the same threshold, so that path implies speech.
+- **Doubled transcripts came from the trailing silence, not the decoder.**
+  The auto-stop waits out ~1.5s of silence, so every capture ended with it,
+  and whisper splits a capture into decode windows: the speech is one
+  segment, the trailing silence is a second. Given ~1.5s of nothing the model
+  hallucinates, and what it usually hallucinates is the sentence it just
+  decoded — `[LAPTOP]` 2026-09-05, one 5.4s capture, segment 0 `[0..400]` and
+  segment 1 `[400..600]` both "I need a new page for the stationary."
+  whisper.cpp *already* clears the decoder's prompt history before a short
+  final window (whisper.cpp:7153), so it was never prompt carryover; the
+  window shouldn't exist. `stop()` now trims it. Do not re-diagnose this as a
+  temperature/ladder problem — that was the previous wrong answer, and
+  `temperature_inc = 0` is a fix for neither.
 - `temperature_inc` was set to `0` for the 35s hang above and that was the
   wrong lever: with no retry to escalate to, the entropy/logprob check can
   reject a repetition-looped decode but not replace it, so the loop gets

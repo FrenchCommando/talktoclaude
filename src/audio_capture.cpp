@@ -33,6 +33,40 @@ constexpr float kSpeechThreshold = 0.01f;
 constexpr uint64_t kTrailingSilenceMs = 1500;
 constexpr uint64_t kMaxUtteranceMs = 30000;
 
+// Silence kept either side of the speech after trimming. Enough that a soft
+// onset or a trailing fricative isn't clipped, short enough that what's left
+// can't form a decode window of its own.
+constexpr size_t kKeepLeadSamples = kTargetSampleRate * 300 / 1000;
+constexpr size_t kKeepTailSamples = kTargetSampleRate * 250 / 1000;
+
+// Drop the silence either side of the speech.
+//
+// The auto-stop only fires after kTrailingSilenceMs, so every utterance ends
+// with ~1.5s of silence, and whisper splits a capture into decode windows:
+// the speech becomes one segment and that trailing silence becomes a second.
+// Asked to decode ~1.5s of nothing the model doesn't emit nothing - it
+// hallucinates, and what it most often hallucinates is the sentence it just
+// decoded, which is how one spoken phrase gets typed twice ([LAPTOP]
+// 2026-09-05: segment 0 [0..400] and segment 1 [400..600] identical over a
+// 5.4s capture). whisper.cpp already clears the decoder's prompt history
+// before a short final window, so this is not prompt carryover - the window
+// simply shouldn't exist. Trimming removes it, and cuts decode time besides.
+void trimSilence(std::vector<float>& audio) {
+    const auto isLoud = [](float sample) { return std::fabs(sample) > kSpeechThreshold; };
+    const auto firstLoud = std::find_if(audio.begin(), audio.end(), isLoud);
+    if (firstLoud == audio.end()) return;  // No speech at all; main.cpp gates that.
+    const auto lastLoud = std::find_if(audio.rbegin(), audio.rend(), isLoud).base();
+
+    const size_t speechStart = static_cast<size_t>(firstLoud - audio.begin());
+    const size_t speechEnd = static_cast<size_t>(lastLoud - audio.begin());
+    const size_t begin = speechStart - std::min(kKeepLeadSamples, speechStart);
+    const size_t end = std::min(audio.size(), speechEnd + kKeepTailSamples);
+
+    // Erase the tail first: trimming the head would invalidate `end`.
+    audio.erase(audio.begin() + end, audio.end());
+    audio.erase(audio.begin(), audio.begin() + begin);
+}
+
 // PKEY_Device_FriendlyName and KSDATAFORMAT_SUBTYPE_IEEE_FLOAT, spelled out
 // instead of pulled in from <functiondiscoverykeys_devpkey.h>/<ksmedia.h>:
 // those headers only *declare* the symbols unless INITGUID is defined first,
@@ -377,11 +411,18 @@ std::vector<float> AudioCapture::stop() {
     std::vector<float> result = std::move(impl_->buffer);
     impl_->buffer.clear();
 
+    // Peak describes what the mic delivered, so measure it before trimming:
+    // main.cpp reads it to tell a dead mic apart from an unspoken utterance,
+    // and a trimmed capture is all speech by construction.
     for (const float sample : result) lastPeak_ = std::max(lastPeak_, std::fabs(sample));
 
-    Log::info("[captured %.1fs, peak %.4f, %llu frames from device (%llu flagged silent)]\n",
-              result.size() / static_cast<double>(kTargetSampleRate), lastPeak_,
-              static_cast<unsigned long long>(impl_->framesSeen.load()),
+    const double capturedSeconds = result.size() / static_cast<double>(kTargetSampleRate);
+    trimSilence(result);
+
+    Log::info("[captured %.1fs, kept %.1fs, peak %.4f, %llu frames from device "
+              "(%llu flagged silent)]\n",
+              capturedSeconds, result.size() / static_cast<double>(kTargetSampleRate),
+              lastPeak_, static_cast<unsigned long long>(impl_->framesSeen.load()),
               static_cast<unsigned long long>(impl_->silentFrames.load()));
     return result;
 }
