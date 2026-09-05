@@ -1,6 +1,6 @@
 # talktoclaude
 
-Voice dictation for Windows: press a media button, speak, press again — the
+Voice dictation for Windows: press a media button, speak, stop speaking — the
 transcript is typed into whatever window has focus, followed by Enter. Local,
 no cloud STT. C++, single .exe, whisper.cpp linked in.
 
@@ -86,25 +86,23 @@ programmatically without controlling focus first.
 
 ## Rejected alternatives (don't re-propose)
 
-- Python (`faster-whisper` + `pynput`) — interpreter/subprocess glue against a
-  single-.exe goal.
+- Python (`faster-whisper` + `pynput`) — a second system to install and keep
+  working, for no gain. C++ talks to the Windows APIs this app is made of
+  directly.
 - Wake-word / always-on VAD as the *primary* trigger — needs a model
   (openWakeWord/Porcupine) to replace a button already in hand.
-- NVIDIA Parakeet/Nemotron — NeMo/CoreML-first, thin Windows tooling.
+- NVIDIA Nemotron — NeMo/CoreML-first, thin Windows tooling. Parakeet is no
+  longer in this list: the pinned whisper.cpp builds `src/parakeet.cpp`
+  in-tree and CMakeLists already names the target. Unevaluated here, but the
+  "thin Windows tooling" objection is dead (checked 2026-09-05).
 - FluidVoice (the macOS app this imitates) — pure Swift, nothing reusable.
 - `WH_KEYBOARD_LL` hook — an AVRCP press never reaches it; hence SMTC.
 
 ## Running
 
-- **Close the running app before building — but say so first.** Windows
-  holds an exclusive lock on a running .exe, so the link step fails against
-  `bin/talktoclaude.exe` while it is up: `tasklist | grep -i talktoclaude`,
-  then `taskkill //PID <pid> //F`, as the first step of a build rather than
-  after it errors out. Martial dictates *with this app*, so a kill
-  interrupts him mid-utterance. Killing it is covered only by the build he
-  just asked for; a rebuild that was your own idea needs a fresh "closing
-  the app to rebuild" first. Never kill a second instance he started after
-  the build you were asked for (2026-09-05: did exactly that, mid-use).
+- **A running app blocks the build** — Windows locks the .exe, so the link
+  step fails. `tasklist | grep -i talktoclaude`, then `taskkill //PID <pid>
+  //F`. Say so before killing it; dictation may be in progress.
 - `setup.bat` [clean] — finds VS Build Tools via `vswhere`, builds with
   CMake/NMake, fetches the model, stages exe + whisper/ggml DLLs into
   `bin/`. Incremental: `build/` is kept, so a source edit rebuilds in ~30s
@@ -125,10 +123,11 @@ programmatically without controlling focus first.
 
 **~1500 lines across six .cpp files. Read all of them before diagnosing
 anything.** The symptom prints in one file and is caused in another: a
-doubled transcript came from a decoder parameter, a 35s stall came from
-what the capture handed over, and reading only where the output appeared
-produced four wrong answers in a row (2026-09-05) before a full read
-found the real defects — which were in files no symptom pointed at.
+doubled transcript printed by the transcriber came from silence the capture
+left on the end, a 35s stall came from what the capture handed over, and
+reading only where the output appeared produced four wrong answers in a row
+(2026-09-05) before a full read found the real defects — which were in files
+no symptom pointed at.
 
 - `CMakeLists.txt` — FetchContent whisper.cpp (pinned), links
   ole32/user32/winmm/windowsapp, copies DLLs next to the exe.
@@ -196,7 +195,8 @@ found the real defects — which were in files no symptom pointed at.
 - `base.en` accuracy on short HFP utterances is mediocre: live example,
   "then commit and close" → "the milk and clothes" (2.6s utterance). Fuel
   for the GPU/`small.en` re-evaluation above.
-- No silence trimming inside an utterance; language hardcoded to "en".
+- Silence is trimmed at the edges of an utterance but not inside one;
+  language hardcoded to "en".
 - Transcription is synchronous and blocks the trigger's message loop, but a
   press during it is *queued*, not lost: SMTC `ButtonPressed` fires on a
   WinRT threadpool thread and is posted into the loop. It used to be handled
