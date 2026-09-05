@@ -37,8 +37,13 @@ jobs:
         with:
           arch: ${{ matrix.arch == 'arm64' && 'amd64_arm64' || 'x64' }}
 
+      # Cross-compiling arm64 on an x64 runner: CMake takes the host as the
+      # target processor unless told, and ggml then compiles its x86 kernels
+      # for an ARM64 link (LNK2005/LNK2019 on ggml_gemv_*). Declare it.
       - name: Configure
-        run: cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+        run: >
+          cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release
+          ${{ matrix.arch == 'arm64' && '-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DGGML_NATIVE=OFF' || '' }}
 
       - name: Build
         run: cmake --build build
