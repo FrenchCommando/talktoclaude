@@ -3,6 +3,13 @@
 #include <cstdint>
 #include <functional>
 #include <string>
+
+// Before the first C++/WinRT header anywhere in the translation unit:
+// trigger.cpp's get_activation_factory<..., ISystemMediaTransportControls
+// Interop> is a classic COM interface, and winrt/base.h only supports those
+// if <unknwn.h> came first. MSVC happened to let it through; clang-cl (the
+// arm64 build) enforces the static_assert.
+#include <unknwn.h>
 #include <winrt/Windows.Media.h>
 
 // Listens for the media Play/Pause button via the System Media Transport
