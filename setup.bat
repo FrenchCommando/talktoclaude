@@ -54,6 +54,10 @@ echo Found VS install: %VSINSTALL%
 REM Deliberately not redirected into %LOG%: vcvarsall leaves something holding
 REM the redirected file open after it returns, and the next append then fails
 REM with a sharing violation. Its banner is five lines, so console is fine.
+REM Build Tools 18's VsDevCmd.bat calls vswhere.exe by bare name and prints
+REM "not recognized" when it isn't on PATH (harmless; it carries on). Put the
+REM installer directory first so the console stays clean.
+set PATH=%ProgramFiles(x86)%\Microsoft Visual Studio\Installer;%PATH%
 call "%VSINSTALL%\VC\Auxiliary\Build\vcvarsall.bat" x64
 if %ERRORLEVEL% neq 0 goto :fail
 
