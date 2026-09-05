@@ -185,7 +185,8 @@ winrt::Windows::Media::Devices::CallControl armCallControlOnCaptureContainer() {
 
 } // namespace
 
-Trigger::Trigger(ToggleCallback callback) : callback_(std::move(callback)) {}
+Trigger::Trigger(Callback onPress, Callback onStopRequest)
+    : onPress_(std::move(onPress)), onStopRequest_(std::move(onStopRequest)) {}
 
 Trigger::~Trigger() {
     stop();
@@ -314,15 +315,11 @@ void Trigger::run() {
             continue;
         }
         if (msg.message == kStopRequestMessage) {
-            if (recording_) {
-                recording_ = false;
-                if (callback_) callback_(false);
-            }
+            if (onStopRequest_) onStopRequest_();
             continue;
         }
         if (msg.message == kButtonToggleMessage) {
-            recording_ = !recording_;
-            if (callback_) callback_(recording_);
+            if (onPress_) onPress_();
             continue;
         }
         TranslateMessage(&msg);

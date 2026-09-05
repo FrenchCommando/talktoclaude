@@ -7,10 +7,37 @@
 
 #include "logging.h"
 
+namespace {
+
+// Title of a top-level window, for the log line that says where the
+// transcript would have gone.
+std::string windowTitle(HWND window) {
+    wchar_t wide[128];
+    const int len = window ? GetWindowTextW(window, wide, 128) : 0;
+    if (len <= 0) return "(untitled)";
+    const int bytes = WideCharToMultiByte(CP_UTF8, 0, wide, len, nullptr, 0, nullptr, nullptr);
+    std::string out(static_cast<size_t>(bytes), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, wide, len, out.data(), bytes, nullptr, nullptr);
+    return out;
+}
+
+}  // namespace
+
 namespace TextInjector {
 
-void typeText(const std::string& utf8Text) {
+Target foregroundTarget() { return GetForegroundWindow(); }
+
+void typeText(const std::string& utf8Text, Target target) {
     if (utf8Text.empty()) return;
+
+    const HWND foreground = GetForegroundWindow();
+    if (foreground != static_cast<HWND>(target)) {
+        Log::error("[inject] focus moved from \"%s\" to \"%s\" during the utterance; "
+                   "transcript not typed\n",
+                   windowTitle(static_cast<HWND>(target)).c_str(),
+                   windowTitle(foreground).c_str());
+        return;
+    }
 
     const int wideLen = MultiByteToWideChar(CP_UTF8, 0, utf8Text.c_str(),
                                             static_cast<int>(utf8Text.size()), nullptr, 0);

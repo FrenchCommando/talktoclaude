@@ -30,38 +30,54 @@ int main(int argc, char** argv) {
     Log::info("talktoclaude ready. Press Play/Pause to talk; recording ends itself "
               "after ~1.5s of silence (or a second press, where the hardware delivers one).\n");
 
-    Trigger trigger([&](bool starting) {
-        if (starting) {
-            Log::info("[listening...]\n");
-            capture.start();
-        } else {
-            std::vector<float> audio = capture.stop();
-            if (audio.empty() || capture.lastPeak() == 0.0f) {
-                Log::info("[no audio captured - the mic delivered silence]\n");
-                return;
-            }
-            // A recording that never crossed the speech threshold is the
-            // decoder's worst input: every temperature fails the no-speech
-            // check, so it walks the whole fallback ladder to arrive at
-            // [BLANK_AUDIO]. Don't decode it. Reachable only via the paths
-            // that skip the capture's own sawSpeech test — the 30s cap and a
-            // second button press; a trailing-silence auto-stop already
-            // implies the same threshold was crossed.
-            if (capture.lastPeak() < AudioCapture::speechThreshold()) {
-                Log::info("[nothing said - peak %.4f below the %.4f speech threshold]\n",
-                          capture.lastPeak(), AudioCapture::speechThreshold());
-                return;
-            }
-            Log::info("[transcribing...]\n");
-            std::string text = transcriber.transcribe(audio);
-            if (text.empty()) {
-                Log::info("[no speech detected]\n");
-                return;
-            }
-            Log::info("> %s\n", text.c_str());
-            TextInjector::typeText(text);
+    // The window the user was in when they pressed the button. The transcript
+    // goes there or nowhere; see TextInjector::typeText.
+    TextInjector::Target target = nullptr;
+
+    const auto startListening = [&] {
+        target = TextInjector::foregroundTarget();
+        Log::info("[listening...]\n");
+        capture.start();
+    };
+
+    const auto finishUtterance = [&] {
+        std::vector<float> audio = capture.stop();
+        if (audio.empty() || capture.lastPeak() == 0.0f) {
+            Log::info("[no audio captured - the mic delivered silence]\n");
+            return;
         }
-    });
+        // A recording that never crossed the speech threshold is the
+        // decoder's worst input: every temperature fails the no-speech
+        // check, so it walks the whole fallback ladder to arrive at
+        // [BLANK_AUDIO]. Don't decode it. Reachable only via the paths
+        // that skip the capture's own sawSpeech test — the 30s cap and a
+        // second button press; a trailing-silence auto-stop already
+        // implies the same threshold was crossed.
+        if (capture.lastPeak() < AudioCapture::speechThreshold()) {
+            Log::info("[nothing said - peak %.4f below the %.4f speech threshold]\n",
+                      capture.lastPeak(), AudioCapture::speechThreshold());
+            return;
+        }
+        Log::info("[transcribing...]\n");
+        const std::string text = transcriber.transcribe(audio);
+        if (text.empty()) {
+            Log::info("[no speech detected]\n");
+            return;
+        }
+        Log::info("> %s\n", text.c_str());
+        TextInjector::typeText(text, target);
+    };
+
+    // The capture's own state decides what a press means, so a press and
+    // an auto-stop can never disagree about whether recording is on.
+    Trigger trigger(
+        [&] {
+            if (capture.isRecording()) finishUtterance();
+            else startListening();
+        },
+        [&] {
+            if (capture.isRecording()) finishUtterance();
+        });
 
     // The utterance ends itself: trailing silence (or the hard cap) posts a
     // stop into the trigger's loop. No second button press is needed — and

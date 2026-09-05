@@ -79,10 +79,16 @@ pinning (solved a problem the interop registration made moot).
   never use them as proof the AVRCP path works.
 - **Injection**: `SendInput` + `KEYEVENTF_UNICODE`, then `VK_RETURN`.
 
-**Injection has no target window.** Whatever has focus when transcription
-*finishes* gets the keystrokes and the Enter. This has already fired a stray
-prompt into an unrelated Claude session. Never drive the trigger
-programmatically without controlling focus first.
+**Injection is guarded by a focus check, not a target window.** `SendInput`
+goes to whatever has focus when transcription *finishes*, and that once
+fired a stray prompt into an unrelated Claude session after focus moved
+mid-utterance. Since 2026-09-05 the foreground window is recorded at the
+starting press and the transcript is dropped (logged with both titles) if a
+different window is in front at injection time. It still cannot *aim*: never
+drive the trigger programmatically without controlling focus first. The
+trigger keeps no recording flag of its own either; main.cpp reads the
+capture's state to decide what a press means, so a press and an auto-stop
+can't disagree.
 
 ## Rejected alternatives (don't re-propose)
 
@@ -181,12 +187,13 @@ no symptom pointed at.
   **All accuracy readings above are confounded: they were taken in a loud
   environment** (through the HFP mic, which degrades under noise first).
   Speed numbers stand; the accuracy column is not a model verdict —
-  re-judge in a quiet room before drawing model conclusions. turbo is the
-  model to revisit *after* the GPU backend exists, not before.
-- GPU unused: `no GPU found`, `backends = 1`. whisper.cpp is built without a
-  backend, so `use gpu = 1` is inert and the RX 9070 XT idles. Vulkan supports
-  AMD — probably the largest available speedup, and the precondition for
-  running anything bigger than small.en (see the model table).
+  re-judge in a quiet room before drawing model conclusions. turbo is
+  unusable on CPU and stays out of the running.
+- Transcription is CPU-only, and that is the project's scope, not a gap.
+  whisper.cpp is built without a GPU backend (`no GPU found`,
+  `backends = 1`, `use gpu = 1` inert), so the RX 9070 XT idles. Adding a
+  Vulkan backend would be a separate project; don't propose it as the next
+  step here. On CPU, base.en at 0.4s per utterance is fast enough.
 - whisper's non-speech markers (`[BLANK_AUDIO]`, `[ Silence ]`) get typed and
   submitted like any other transcript. Deliberate, but rarer now: a capture
   that never crossed `kSpeechThreshold` is dropped before the decoder and
@@ -194,7 +201,7 @@ no symptom pointed at.
   marker means whisper heard *something* and made nothing of it.
 - `base.en` accuracy on short HFP utterances is mediocre: live example,
   "then commit and close" → "the milk and clothes" (2.6s utterance). Fuel
-  for the GPU/`small.en` re-evaluation above.
+  for the quiet-room `small.en` re-evaluation above.
 - Silence is trimmed at the edges of an utterance but not inside one;
   language hardcoded to "en".
 - Transcription is synchronous and blocks the trigger's message loop, but a

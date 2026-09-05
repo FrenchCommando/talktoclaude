@@ -29,16 +29,21 @@
 // Deliberate cost: while talktoclaude runs it wants the button, so the
 // headset can't pause other apps' media.
 //
-// Each press toggles recording; the callback is invoked with `true` to mean
-// "start" and `false` to mean "stop". ButtonPressed fires on a WinRT
-// threadpool thread, so presses are posted into run()'s message loop and the
-// callback always runs on the run() thread — serialized with requestStop()
-// and with however long the callback itself blocks (transcription).
+// The trigger keeps no recording state of its own: a press and a stop
+// request are reported as two events, and the owner (main.cpp) decides what
+// each means from the capture's actual state. It used to keep a toggle flag
+// alongside the capture's, and the two could disagree — a stop press landing
+// just after the auto-stop had posted its own stop was processed as a fresh
+// toggle and started a new recording. ButtonPressed fires on a WinRT
+// threadpool thread, so presses are posted into run()'s message loop and
+// both callbacks always run on the run() thread — serialized with each
+// other and with however long a callback itself blocks (transcription).
 class Trigger {
 public:
-    using ToggleCallback = std::function<void(bool starting)>;
+    using Callback = std::function<void()>;
 
-    explicit Trigger(ToggleCallback callback);
+    // `onPress` for a Play/Pause press; `onStopRequest` for requestStop().
+    Trigger(Callback onPress, Callback onStopRequest);
     ~Trigger();
 
     // Registers the SMTC session and pumps a message loop so WinRT
@@ -53,15 +58,15 @@ public:
     // console as well as the file.
     void reclaim(bool announce);
 
-    // Ends the current recording as if the stop press had arrived. Safe to
-    // call from any thread (posts to the trigger thread's message loop);
-    // used by the capture side's silence auto-stop, since this hardware
-    // delivers no button press while the mic is open.
+    // Delivers a stop request to the run() thread. Safe to call from any
+    // thread (posts to the trigger thread's message loop); used by the
+    // capture side's silence auto-stop, since this hardware delivers no
+    // button press while the mic is open.
     void requestStop();
 
 private:
-    ToggleCallback callback_;
-    bool recording_ = false;
+    Callback onPress_;
+    Callback onStopRequest_;
     unsigned long threadId_ = 0;
     // SetTimer with a null window ignores the id you give it and returns a
     // generated one, which is what WM_TIMER's wParam carries. Spelled as
