@@ -137,8 +137,21 @@ can't disagree.
   `installer/talktoclaude.iss` for a per-user installer that adds the
   install dir to the user PATH. A `v*` tag attaches all four to a release.
   `pages.yml` publishes `site/` (landing page with a replayed demo) to
-  GitHub Pages. arm64 is compiled cross on an x64 runner and has never been
-  run on arm64 hardware.
+  https://frenchcommando.github.io/talktoclaude/, which reads the latest
+  release from the GitHub API for its download button. First release
+  v0.1.0 on 2026-09-05; MIT licensed since 2026-09-06 (v0.1.0's assets
+  predate the LICENSE file). The installer has been built in CI only, never
+  run on a real machine; the zip's exe was (see the paths bullet).
+- **arm64 is cross-compiled and needs three things** (each found by a red
+  CI run, 2026-09-05): `CMAKE_SYSTEM_PROCESSOR=ARM64` or ggml compiles its
+  x86 kernels for an ARM link; `clang-cl` with `--target=arm64-pc-windows-
+  msvc` because ggml refuses MSVC for ARM outright; and `/EHsc` re-added
+  once `CMAKE_CXX_FLAGS` is overridden. clang-cl also enforces C++/WinRT's
+  rule that `<unknwn.h>` precede its headers when a classic COM interface
+  is used, hence the include at the top of trigger.h. Never run on arm64
+  hardware.
+- **Signing:** the exe is unsigned, so SmartScreen warns on first run.
+  Deliberate for now; the fix costs a certificate.
 
 ## Code layout
 
@@ -220,6 +233,13 @@ no symptom pointed at.
   for the quiet-room `small.en` re-evaluation above.
 - Silence is trimmed at the edges of an utterance but not inside one;
   language hardcoded to "en".
+- Speech detection is a single-sample peak test, so one click counts as
+  speech: it sets `sawSpeech`, the 1.5s timer runs out, and the capture
+  ends with ~50ms of "speech" in it. Observed `[LAPTOP]` 2026-09-05 as
+  `captured 4.9s, kept 0.6s` (0.6 = 300ms lead + 250ms tail + the click),
+  during button fiddling rather than dictation. A windowed RMS would fix it
+  but changes what the 0.01 threshold means and needs re-tuning on the
+  buds; not done because it has never typed junk during real use.
 - Transcription is synchronous and blocks the trigger's message loop, but a
   press during it is *queued*, not lost: SMTC `ButtonPressed` fires on a
   WinRT threadpool thread and is posted into the loop. It used to be handled
