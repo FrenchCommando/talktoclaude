@@ -72,7 +72,7 @@
   #arm-up, #arm-rest { transition: opacity .25s; }
   .phase-press #arm-up, .phase-speak #arm-up { opacity: 1; }
   .phase-press #arm-rest, .phase-speak #arm-rest { opacity: 0; }
-  #mouth { transform-origin: 196px 136px; }
+  #mouth { transform-origin: 186px 138px; }
   .phase-speak #mouth { animation: talk .28s ease-in-out infinite alternate; }
   @keyframes talk { from { transform: scaleY(.3); } to { transform: scaleY(1.6); } }
   .wave { opacity: 0; stroke: var(--accent); }
@@ -150,36 +150,35 @@
       <!-- couch -->
       <g id="couch" class="stroke" style="fill: var(--line)">
         <rect x="118" y="108" width="36" height="124" rx="14"/>
-        <rect x="130" y="188" width="212" height="34" rx="10"/>
-        <rect x="332" y="176" width="28" height="50" rx="11"/>
-        <rect x="118" y="218" width="242" height="22" rx="6"/>
-        <line x1="236" y1="192" x2="236" y2="220" opacity=".5"/>
+        <rect x="130" y="188" width="140" height="34" rx="10"/>
+        <rect x="262" y="172" width="28" height="54" rx="11"/>
+        <rect x="118" y="218" width="172" height="22" rx="6"/>
       </g>
       <!-- Sticky, slouched -->
       <g id="sticky">
-        <circle class="stroke" cx="196" cy="120" r="24"/>
-        <circle class="fill" cx="188" cy="114" r="2.2"/>
-        <circle class="fill" cx="204" cy="114" r="2.2"/>
-        <path id="mouth" class="stroke" d="M189 134 q7 4 14 0"/>
+        <circle class="stroke" cx="186" cy="124" r="22"/>
+        <circle class="fill" cx="178" cy="118" r="2.2"/>
+        <circle class="fill" cx="194" cy="118" r="2.2"/>
+        <path id="mouth" class="stroke" d="M179 136 q7 4 14 0"/>
         <!-- earbud -->
-        <circle class="fill" cx="218" cy="122" r="4" style="fill: var(--accent)"/>
-        <circle id="tap" cx="218" cy="122" r="4"/>
-        <!-- body, leaning back into the cushions -->
-        <path class="stroke" d="M204 142 L262 196"/>
-        <!-- left arm, resting on the lap -->
-        <path class="stroke" d="M222 158 L246 184 L270 186"/>
-        <!-- right arm: two poses, along the backrest and hand on the earbud -->
-        <path id="arm-rest" class="stroke" d="M222 158 L250 172 L286 194"/>
-        <path id="arm-up" class="stroke" d="M222 158 L242 136 L224 118"/>
-        <!-- legs, stretched out -->
-        <path class="stroke" d="M262 196 L310 202 L352 236 M262 196 L300 214 L336 238"/>
+        <circle class="fill" cx="208" cy="126" r="4" style="fill: var(--accent)"/>
+        <circle id="tap" cx="208" cy="126" r="4"/>
+        <!-- spine, rounded into the cushions -->
+        <path class="stroke" d="M196 144 C 184 172, 206 196, 244 196"/>
+        <!-- belly -->
+        <path class="stroke" d="M206 152 C 274 148, 288 198, 244 196"/>
+        <!-- arm: two poses, hand behind the head and hand on the earbud -->
+        <path id="arm-rest" class="stroke" d="M206 154 L226 132 L200 102"/>
+        <path id="arm-up" class="stroke" d="M206 154 L234 142 L214 124"/>
+        <!-- legs, draped over the armrest -->
+        <path class="stroke" d="M244 196 L288 182 L306 236 M244 196 L282 190 L294 238"/>
         <!-- sound waves -->
-        <g transform="translate(236 118)">
+        <g transform="translate(226 122)">
           <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
           <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
           <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
         </g>
-        <text class="zzz" x="228" y="84">…couch mode…</text>
+        <text class="zzz" x="236" y="94">…couch mode…</text>
       </g>
       <!-- laptop -->
       <g id="laptop" transform="translate(560 100)">
