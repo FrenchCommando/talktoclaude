@@ -214,10 +214,12 @@ void Trigger::notify(const std::string& title, const std::string& text) {
 
 void Trigger::onTrayEvent(unsigned event) {
     switch (event) {
+        // Either click opens the menu. A left-click used to act as a button
+        // press, which can't work: clicking the icon gives the taskbar
+        // focus, so the window recorded at the "press" is the taskbar and
+        // the transcript has nowhere to go. Only the headset button, which
+        // leaves focus alone, can start listening (2026-09-06).
         case WM_LBUTTONUP:
-            // A click on the icon is a press: handy without a headset.
-            PostThreadMessageW(threadId_, kButtonToggleMessage, 0, 0);
-            break;
         case WM_CONTEXTMENU:
         case WM_RBUTTONUP: {
             const unsigned chosen = Tray::showMenu(window_);

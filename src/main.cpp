@@ -17,9 +17,9 @@ namespace {
 const char* const kUsage =
     "usage: talktoclaude [--console] [model.bin]\n\n"
     "Runs in the notification area. Press the Play/Pause button on a Bluetooth\n"
-    "headset (or a keyboard media key, or click the tray icon), speak, and stop;\n"
-    "the transcript is typed into the focused window, then Enter. Right-click the\n"
-    "icon to open the log folder or quit.\n\n"
+    "headset (or a keyboard media key), speak, and stop; the transcript is typed\n"
+    "into the focused window, then Enter. Click the icon to open the log folder\n"
+    "or quit.\n\n"
     "Without a model argument the base.en whisper model is used, downloaded on\n"
     "first run into %LOCALAPPDATA%\\talktoclaude\\models. Logs go to the logs\\\n"
     "folder next to it (or the repo's logs\\ when run from a checkout).\n"

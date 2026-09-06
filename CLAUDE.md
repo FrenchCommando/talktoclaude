@@ -204,8 +204,12 @@ no symptom pointed at.
   resources), four states, balloon, right-click menu. Owned by trigger.cpp's
   hidden window; `Trigger::start()` creates window + icon + SMTC before
   main loads the model so the icon shows "loading" through a first-run
-  download, `run()` pumps. Left-click posts the same message as a button
-  press. The exe is `WIN32_EXECUTABLE` with `/ENTRY:mainCRTStartup`; there
+  download, `run()` pumps. Either click opens the menu; left-click used to
+  act as a press and was removed the same day because it can't work:
+  clicking the icon focuses the taskbar, so the window captured for
+  injection is the taskbar and the transcript has nowhere to go. Only a
+  trigger that leaves focus alone (the headset button, a media key) can
+  start listening. The exe is `WIN32_EXECUTABLE` with `/ENTRY:mainCRTStartup`; there
   is no console unless `--console`, which `AttachConsole`s the parent
   terminal or allocates one, and `Log::setConsole(true)`. Consequence for
   scripts: `--help` output goes to the attached console, not a pipe, so CI

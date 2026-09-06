@@ -24,8 +24,8 @@ Either way the first run downloads the `base.en` model (142 MB) into
 uses a different model.
 
 It runs as a notification-area icon: grey ready, red listening, amber
-transcribing, blue loading. Left-click acts as a button press; right-click
-opens the log folder or quits. There is no console unless you pass
+transcribing, blue loading. Clicking it opens a menu: log folder, quit.
+Nothing on the icon starts listening; only the button does. There is no console unless you pass
 `--console`, which attaches one (or the terminal you launched from) and
 prints everything the log gets. Only one instance runs at a time. Built by `.github/workflows/build.yml` on every
 push; a `v*` tag publishes a release.
