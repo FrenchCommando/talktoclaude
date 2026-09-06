@@ -109,17 +109,13 @@ can't disagree.
 - **A running app blocks the build** — Windows locks the .exe, so the link
   step fails. `tasklist | grep -i talktoclaude`, then `taskkill //PID <pid>
   //F`. Say so before killing it; dictation may be in progress.
-- **Check `tasklist` before launching a dev build.** Building is safe with
-  the installed app running: the exes are separate files. Running two
-  copies at once is where they overlap, and only while both are alive: each
-  re-asserts the media session every 3s, so the button bounces between
-  them, and a press in that window would be transcribed and typed by both.
-  Nothing persists: kill one and the other is sole owner again. Happened
-  2026-09-06 for ~10s during a smoke test while the installed v0.1.1 was
-  up; no press was made, no damage, and the user's instance could have
-  stayed open. Still, look first, and if the user's copy is running ask
-  rather than run alongside it. The v0.2.0 mutex blocks a second *guarded*
-  instance, not an older build.
+- **Two copies can run at once, briefly, without harm.** Building is safe
+  with the installed app running (separate files), and so is a short smoke
+  test of a dev build: while both are alive the media session bounces
+  between them every 3s and a press would be typed twice, and the moment
+  one exits the other is sole owner again. Nothing persists. Smoke-test
+  freely; just don't leave two running. The v0.2.0 mutex blocks a second
+  guarded instance, not an older build.
 - `setup.bat` [clean] — finds VS Build Tools via `vswhere`, builds with
   CMake/NMake, fetches the model, stages exe + whisper/ggml DLLs into
   `bin/`. Incremental: `build/` is kept, so a source edit rebuilds in ~30s
