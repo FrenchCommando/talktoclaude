@@ -159,6 +159,13 @@ can't disagree.
   rule that `<unknwn.h>` precede its headers when a classic COM interface
   is used, hence the include at the top of trigger.h. Never run on arm64
   hardware.
+- **CI builds ggml with `GGML_NATIVE=OFF` and AVX2/FMA/F16C pinned.** The
+  default (native) compiled for the runner's AVX-512 CPU, and v0.2.0
+  crashed on `[LAPTOP]` with `0xC000001D` in ggml-cpu.dll the moment the
+  model loaded (Application event log, 2026-09-06 15:38). The log file
+  ends after `whisper_backend_init_gpu` with no "ready", which is the
+  signature. v0.2.1 fixed it; the CI zip was run on `[LAPTOP]` to confirm.
+  Local `setup.bat` builds stay native and are fine on their own machine.
 - **Signing:** the exe is unsigned, so SmartScreen warns on first run.
   Deliberate for now; the fix costs a certificate.
 
