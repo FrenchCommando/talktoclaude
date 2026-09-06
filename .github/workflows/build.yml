@@ -47,11 +47,13 @@ jobs:
       # target processor unless told, and ggml then compiles its x86 kernels
       # for an ARM64 link (LNK2005/LNK2019 on ggml_gemv_*). Declare it. ggml
       # also refuses MSVC for ARM ("use clang"), so use the clang-cl that
-      # ships with Visual Studio, targeting arm64.
+      # ships with Visual Studio, targeting arm64. The icon .rc must go to
+      # rc.exe, and Ninja's cmcldeps wrapper (which scans .rc includes with
+      # the C compiler) breaks on clang-cl, so it is disabled for RC.
       - name: Configure
         run: >
           cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF
-          ${{ matrix.arch == 'arm64' && '-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_RC_COMPILER=rc -DCMAKE_C_FLAGS=--target=arm64-pc-windows-msvc "-DCMAKE_CXX_FLAGS=--target=arm64-pc-windows-msvc /EHsc"' || '-DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON' }}
+          ${{ matrix.arch == 'arm64' && '-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_RC_COMPILER=rc -DCMAKE_NINJA_CMCLDEPS_RC=OFF -DCMAKE_C_FLAGS=--target=arm64-pc-windows-msvc "-DCMAKE_CXX_FLAGS=--target=arm64-pc-windows-msvc /EHsc"' || '-DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON' }}
 
       - name: Build
         run: cmake --build build
