@@ -97,7 +97,7 @@
       </span>
     </div>
     <div class="panes">
-      <div class="pane"><div class="pane-title">talktoclaude.exe</div><div id="console"><span class="dim">talktoclaude ready. Press Play/Pause to talk; recording ends itself after ~1.5s of silence.</span>
+      <div class="pane"><div class="pane-title">talktoclaude --console</div><div id="console"><span class="dim">talktoclaude ready. Press Play/Pause to talk; recording ends itself after ~1.5s of silence.</span>
 </div></div>
       <div class="pane"><div class="pane-title">focused window: Claude Code</div><div id="target"></div><div class="prompt-line">&gt; <span id="typed"></span><span class="caret"></span></div></div>
     </div>
@@ -114,11 +114,11 @@
   <h2>Get it running</h2>
   <ol>
     <li>Run the installer. It goes into your user profile and onto your PATH, no admin prompt. Or unzip the portable build anywhere.</li>
-    <li>Type <code>talktoclaude</code> in any terminal, or open it from the Start menu. The first run fetches the speech model (142 MB) into your local app data.</li>
+    <li>Type <code>talktoclaude</code> in any terminal, or open it from the Start menu. It lives in the notification area: grey when ready, red while listening, amber while transcribing. The first run fetches the speech model (142 MB) into your local app data.</li>
     <li>Pair your earbuds. If Windows offers "Use LE Audio when available", turn it off: the buds have to sit in classic Bluetooth for the button to arrive.</li>
     <li>Focus the window you want to talk into, press the button, speak.</li>
   </ol>
-  <p class="muted">Close the console window to quit. Ctrl+Alt+V takes the media button back if another app grabbed it. <code>talktoclaude path\to\other-model.bin</code> tries a different whisper model.</p>
+  <p class="muted">Right-click the icon to quit or open the logs. Left-click it to start listening without a headset. Ctrl+Alt+V takes the media button back if another app grabbed it. <code>talktoclaude path\to\other-model.bin</code> tries a different whisper model; <code>--console</code> shows the log live.</p>
 
   <h2>Numbers</h2>
   <div class="tbl"><table>

@@ -12,6 +12,8 @@
 #include <unknwn.h>
 #include <winrt/Windows.Media.h>
 
+#include "tray.h"
+
 // Listens for the media Play/Pause button via the System Media Transport
 // Controls (SMTC) API. This is the layer a Bluetooth headset's AVRCP
 // play/pause command goes through on Windows — it does NOT surface as a
@@ -50,15 +52,30 @@ public:
     using Callback = std::function<void()>;
 
     // `onPress` for a Play/Pause press; `onStopRequest` for requestStop().
-    Trigger(Callback onPress, Callback onStopRequest);
+    // `logDir` is what the tray menu's "Open log folder" opens.
+    Trigger(Callback onPress, Callback onStopRequest, std::string logDir);
     ~Trigger();
 
-    // Registers the SMTC session and pumps a message loop so WinRT
-    // callbacks can be dispatched. Blocks until stop() is called (from
-    // another thread) or the process receives WM_QUIT.
+    // Creates the hidden window, the tray icon, and the SMTC registration.
+    // Split from run() so the icon is up (showing "loading") while main
+    // loads the model, which can take a first-run download. Same thread as
+    // run(): the window, hotkey, and timer are bound to it.
+    bool start();
+
+    // Pumps the message loop so WinRT callbacks and tray clicks can be
+    // dispatched. Blocks until stop() is called (from another thread), the
+    // tray menu's Quit, or WM_QUIT.
     void run();
 
     void stop();
+
+    // Tray icon colour and hover text. Call from the run() thread.
+    void setState(Tray::State state, const std::string& tip);
+    // One-shot balloon.
+    void notify(const std::string& title, const std::string& text);
+
+    // Tray callback plumbing, called from the window procedure.
+    void onTrayEvent(unsigned event);
 
     // Re-asserts the SMTC session after another app has taken it. Called on
     // a timer while running, and by a global hotkey. `announce` logs to the
@@ -74,6 +91,9 @@ public:
 private:
     Callback onPress_;
     Callback onStopRequest_;
+    std::string logDir_;
+    void* window_ = nullptr;  // HWND, opaque here
+    bool trayAdded_ = false;
     unsigned long threadId_ = 0;
     // SetTimer with a null window ignores the id you give it and returns a
     // generated one, which is what WM_TIMER's wParam carries. Spelled as

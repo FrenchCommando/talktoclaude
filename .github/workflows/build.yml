@@ -66,9 +66,10 @@ jobs:
         if: matrix.arch == 'x64'
         shell: pwsh
         run: |
-          $out = & stage\x64\talktoclaude.exe --help
-          $out
-          if ($LASTEXITCODE -ne 0 -or -not ($out -join "`n").Contains("usage:")) { throw "--help failed" }
+          # A windows-subsystem exe: its --help output goes to an attached
+          # console, not to a pipe, so check the exit code only.
+          $p = Start-Process -FilePath stage\x64\talktoclaude.exe -ArgumentList --help -Wait -PassThru -NoNewWindow
+          if ($p.ExitCode -ne 0) { throw "--help exited $($p.ExitCode)" }
 
       - name: Installer
         shell: pwsh

@@ -72,7 +72,15 @@ std::string currentSessionOwner() {
 // HID reports on the consumer (0x0C) and telephony (0x0B) usage pages.
 // Deliberately narrow: ordinary typing is never examined or logged.
 
+// The Trigger that owns the hidden window; there is exactly one.
+Trigger* g_trigger = nullptr;
+
 LRESULT CALLBACK probeWndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    if (message == Tray::kCallbackMessage) {
+        // NOTIFYICON_VERSION_4: the event is in the low word of lParam.
+        if (g_trigger) g_trigger->onTrayEvent(LOWORD(lParam));
+        return 0;
+    }
     if (message == WM_INPUT) {
         UINT size = 0;
         GetRawInputData(reinterpret_cast<HRAWINPUT>(lParam), RID_INPUT, nullptr, &size,
@@ -185,11 +193,45 @@ winrt::Windows::Media::Devices::CallControl armCallControlOnCaptureContainer() {
 
 } // namespace
 
-Trigger::Trigger(Callback onPress, Callback onStopRequest)
-    : onPress_(std::move(onPress)), onStopRequest_(std::move(onStopRequest)) {}
+Trigger::Trigger(Callback onPress, Callback onStopRequest, std::string logDir)
+    : onPress_(std::move(onPress)), onStopRequest_(std::move(onStopRequest)),
+      logDir_(std::move(logDir)) {
+    g_trigger = this;
+}
 
 Trigger::~Trigger() {
     stop();
+    g_trigger = nullptr;
+}
+
+void Trigger::setState(Tray::State state, const std::string& tip) {
+    if (trayAdded_) Tray::set(window_, state, tip);
+}
+
+void Trigger::notify(const std::string& title, const std::string& text) {
+    if (trayAdded_) Tray::notify(window_, title, text);
+}
+
+void Trigger::onTrayEvent(unsigned event) {
+    switch (event) {
+        case WM_LBUTTONUP:
+            // A click on the icon is a press: handy without a headset.
+            PostThreadMessageW(threadId_, kButtonToggleMessage, 0, 0);
+            break;
+        case WM_CONTEXTMENU:
+        case WM_RBUTTONUP: {
+            const unsigned chosen = Tray::showMenu(window_);
+            if (chosen == Tray::kMenuQuit) {
+                Log::info("[tray] quit\n");
+                PostQuitMessage(0);
+            } else if (chosen == Tray::kMenuOpenLogs) {
+                ShellExecuteA(nullptr, "open", logDir_.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+            }
+            break;
+        }
+        default:
+            break;
+    }
 }
 
 void Trigger::onButtonPressed(
@@ -215,18 +257,24 @@ void Trigger::onButtonPressed(
     if (threadId_ != 0) PostThreadMessageW(threadId_, kButtonToggleMessage, 0, 0);
 }
 
-void Trigger::run() {
+bool Trigger::start() {
     // AudioCapture already CoInitializeEx's this thread as MTA; match that
     // apartment type here or WinRT's own init throws RPC_E_CHANGED_MODE.
     winrt::init_apartment(winrt::apartment_type::multi_threaded);
     threadId_ = GetCurrentThreadId();
 
     HWND window = createHiddenWindow();
+    window_ = window;
+    if (!window) return false;
+
+    trayAdded_ = Tray::add(window);
+    if (!trayAdded_) Log::error("[tray] Shell_NotifyIcon failed; no tray icon\n");
+    setState(Tray::State::Busy, "talktoclaude: loading");
 
     // The canonical desktop-app SMTC registration: GetForWindow, metadata,
     // PlaybackStatus = Playing. This is what makes GetCurrentSession()
     // able to return us, which is what AVRCP presses route by.
-    if (window) {
+    {
         try {
             auto interop = winrt::get_activation_factory<SystemMediaTransportControls,
                                                          ISystemMediaTransportControlsInterop>();
@@ -275,7 +323,12 @@ void Trigger::run() {
     // thread blocks on it, and this thread is inside the callback
     // (transcribing, or feeding SendInput) rather than pumping messages, so
     // every injected keystroke stalls all input until the hook times out.
-    if (window) startPressProbe(window);
+    startPressProbe(window);
+    return true;
+}
+
+void Trigger::run() {
+    HWND window = static_cast<HWND>(window_);
 
     // Call-control probe: in hands-free mode a headset's button is a call
     // button, not a media button — idle HFP typically maps it to "redial",
@@ -336,7 +389,10 @@ void Trigger::run() {
         smtc_.IsEnabled(false);
         smtc_ = nullptr;
     }
+    if (trayAdded_) Tray::remove(window);
+    trayAdded_ = false;
     if (window) DestroyWindow(window);
+    window_ = nullptr;
 }
 
 void Trigger::reclaim(bool announce) {

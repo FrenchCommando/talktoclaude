@@ -50,7 +50,14 @@ add_executable(talktoclaude
     src/trigger.cpp
     src/text_injector.cpp
     src/transcriber.cpp
+    src/tray.cpp
 )
+
+# A tray app: no console window of its own (--console attaches one). The
+# entry point stays main(), so the linker is told where to start instead of
+# looking for WinMain.
+set_target_properties(talktoclaude PROPERTIES WIN32_EXECUTABLE TRUE)
+target_link_options(talktoclaude PRIVATE /ENTRY:mainCRTStartup)
 
 target_include_directories(talktoclaude PRIVATE
     ${whisper_cpp_SOURCE_DIR}/include

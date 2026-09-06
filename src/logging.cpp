@@ -10,6 +10,7 @@ namespace {
 
 FILE* g_file = nullptr;
 std::string g_path;
+bool g_console = false;
 
 // The capture thread, the trigger's message loop, and whisper's worker
 // threads all log. fprintf locks per-call, so nothing corrupts, but a line
@@ -22,7 +23,7 @@ std::mutex g_mutex;
 // line without the prefix, so the terminal keeps looking like it did.
 void emit(FILE* console, const char* fmt, va_list args) {
     const std::lock_guard<std::mutex> lock(g_mutex);
-    if (console) {
+    if (console && g_console) {
         va_list copy;
         va_copy(copy, args);
         vfprintf(console, fmt, copy);
@@ -40,6 +41,8 @@ void emit(FILE* console, const char* fmt, va_list args) {
 }  // namespace
 
 namespace Log {
+
+void setConsole(bool enabled) { g_console = enabled; }
 
 bool init(const std::string& dir) {
     SYSTEMTIME t;

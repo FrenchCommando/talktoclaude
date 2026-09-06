@@ -122,7 +122,9 @@ can't disagree.
   `large-v3-turbo`, fetching the model on first use (setup.bat only ships
   base.en; the fetch goes to `.part` then renames, so a truncated download
   never looks like a model).
-- Close the console or Ctrl+C to quit.
+- Quit from the tray menu. `run.bat` launches the tray app too; add
+  `--console` to see output while developing. A running app still blocks
+  the build, and now it has no window to remind you: `tasklist`.
 - `logs/` (gitignored): `talktoclaude-<stamp>.log` per run, plus setup logs.
 - **The batch files are dev tooling and don't ship.** The product is the
   bare exe (`src/paths.cpp`): with no argument it looks for
@@ -155,7 +157,7 @@ can't disagree.
 
 ## Code layout
 
-**~1700 lines across seven .cpp files. Read all of them before diagnosing
+**~1900 lines across eight .cpp files. Read all of them before diagnosing
 anything.** The symptom prints in one file and is caused in another: a
 doubled transcript printed by the transcriber came from silence the capture
 left on the end, a 35s stall came from what the capture handed over, and
@@ -184,6 +186,16 @@ no symptom pointed at.
   does no dedupe — text-level "collapse the repeat" heuristics eat real
   speech ("go go" → "go").
 - `src/text_injector.{h,cpp}` — see the injection warning above.
+- `src/tray.{h,cpp}` — notification-area icon: discs drawn at runtime (no
+  resources), four states, balloon, right-click menu. Owned by trigger.cpp's
+  hidden window; `Trigger::start()` creates window + icon + SMTC before
+  main loads the model so the icon shows "loading" through a first-run
+  download, `run()` pumps. Left-click posts the same message as a button
+  press. The exe is `WIN32_EXECUTABLE` with `/ENTRY:mainCRTStartup`; there
+  is no console unless `--console`, which `AttachConsole`s the parent
+  terminal or allocates one, and `Log::setConsole(true)`. Consequence for
+  scripts: `--help` output goes to the attached console, not a pipe, so CI
+  checks the exit code only. Single instance via a named mutex.
 - `src/logging.{h,cpp}` — console + file; `Log::fileOnly` for whisper's chatter.
 - `src/paths.{h,cpp}` — log dir, default model lookup, first-run download.
 - `src/main.cpp` — wires it together.

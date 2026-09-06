@@ -10,6 +10,10 @@ namespace Log {
 // Opens <dir>\talktoclaude-YYYYMMDD-HHMMSS.log. Safe to skip checking the
 // result: on failure logging silently degrades to console-only.
 bool init(const std::string& dir);
+
+// Whether info/error also go to stdout/stderr. Off by default: the exe is
+// a windows-subsystem app with no console unless main attached one.
+void setConsole(bool enabled);
 void close();
 
 // Both go to the log file; info also to stdout, error also to stderr.

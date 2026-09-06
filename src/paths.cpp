@@ -80,7 +80,7 @@ std::wstring repoDir(const wchar_t* sub) {
 // Plain WinHTTP GET to a file, following redirects (huggingface hands off to
 // a CDN), with a percentage on the console. Writes to <dest>.part and
 // renames on success so a truncated download never looks like a model.
-bool download(const std::wstring& dest) {
+bool download(const std::wstring& dest, const Paths::Progress& progress) {
     const std::wstring part = dest + L".part";
     bool ok = false;
 
@@ -135,13 +135,12 @@ bool download(const std::wstring& dest) {
                 if (total) {
                     const int percent = static_cast<int>(received * 100 / total);
                     if (percent != lastPercent) {
-                        printf("\r[model] %d%% of %llu MB", percent, total >> 20);
-                        fflush(stdout);
+                        if (progress) progress(percent);
+                        if (percent % 10 == 0) Log::fileOnly("[model] %d%%\n", percent);
                         lastPercent = percent;
                     }
                 }
             }
-            printf("\n");
             if (ok && total && received != total) {
                 Log::error("[model] short download: %llu of %llu bytes\n", received, total);
                 ok = false;
@@ -172,7 +171,7 @@ std::string logDir() {
     return toUtf8(dir);
 }
 
-std::string defaultModel() {
+std::string defaultModel(const Progress& progress) {
     const std::wstring repo = repoDir(L"models");
     if (!repo.empty() && exists(repo + L"\\" + kModelFile)) return toUtf8(repo + L"\\" + kModelFile);
 
@@ -186,7 +185,7 @@ std::string defaultModel() {
 
     Log::info("[model] first run: fetching base.en (142 MB, once) into %s\n",
               toUtf8(data).c_str());
-    if (!download(model)) return {};
+    if (!download(model, progress)) return {};
     return toUtf8(model);
 }
 

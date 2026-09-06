@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 
 // Where things live. Two layouts:
@@ -18,7 +19,9 @@ std::string logDir();
 // The model to load when none is given on the command line. Looks for
 // ggml-base.en.bin in the repo layout first, then the LocalAppData models
 // folder; if neither has it, downloads it into the latter (142 MB, once)
-// with progress on the console. Returns an empty string if that fails.
-std::string defaultModel();
+// reporting whole-percent progress through `progress` (called from the
+// calling thread, 0 to 100). Returns an empty string if that fails.
+using Progress = std::function<void(int percent)>;
+std::string defaultModel(const Progress& progress);
 
 }  // namespace Paths

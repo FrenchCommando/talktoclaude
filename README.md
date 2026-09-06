@@ -21,7 +21,13 @@ From the [latest release](https://github.com/FrenchCommando/talktoclaude/release
 Either way the first run downloads the `base.en` model (142 MB) into
 `%LOCALAPPDATA%\talktoclaude\models`, and logs go to
 `%LOCALAPPDATA%\talktoclaude\logs`. `talktoclaude some\other\model.bin`
-uses a different model. Built by `.github/workflows/build.yml` on every
+uses a different model.
+
+It runs as a notification-area icon: grey ready, red listening, amber
+transcribing, blue loading. Left-click acts as a button press; right-click
+opens the log folder or quits. There is no console unless you pass
+`--console`, which attaches one (or the terminal you launched from) and
+prints everything the log gets. Only one instance runs at a time. Built by `.github/workflows/build.yml` on every
 push; a `v*` tag publishes a release.
 
 Windows only: capture, trigger, and injection are WASAPI, SMTC, and
