@@ -32,6 +32,7 @@ Compression=lzma2
 SolidCompression=yes
 ChangesEnvironment=yes
 UninstallDisplayIcon={app}\talktoclaude.exe
+LicenseFile={#Src}\LICENSE
 #if Arch == "arm64"
 ArchitecturesAllowed=arm64
 ArchitecturesInstallIn64BitMode=arm64
@@ -43,6 +44,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 [Files]
 Source: "{#Src}\talktoclaude.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#Src}\*.dll"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#Src}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{userprograms}\talktoclaude"; Filename: "{app}\talktoclaude.exe"

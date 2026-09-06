@@ -56,7 +56,7 @@ jobs:
           $stage = "stage\${{ matrix.arch }}"
           New-Item -ItemType Directory -Force $stage | Out-Null
           Copy-Item build\talktoclaude.exe, build\*.dll $stage
-          Copy-Item README.md $stage
+          Copy-Item README.md, LICENSE $stage
           Get-ChildItem $stage | Select-Object Name, Length
           if (-not (Test-Path "$stage\talktoclaude.exe")) { throw "no exe staged" }
           New-Item -ItemType Directory -Force dist | Out-Null

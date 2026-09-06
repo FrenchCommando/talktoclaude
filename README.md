@@ -6,6 +6,8 @@ STT via whisper.cpp — nothing leaves the machine.
 
 See `CLAUDE.md` for the design rationale. Site: https://frenchcommando.github.io/talktoclaude/
 
+MIT licensed (see `LICENSE`); whisper.cpp and ggml, linked in, are MIT too.
+
 ## Download (Windows 11, x64 or arm64)
 
 From the [latest release](https://github.com/FrenchCommando/talktoclaude/releases/latest):
