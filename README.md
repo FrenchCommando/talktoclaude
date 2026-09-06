@@ -25,7 +25,9 @@ uses a different model.
 
 It runs as a notification-area icon: grey ready, red listening, amber
 transcribing, blue loading. Clicking it opens a menu: log folder, quit.
-Nothing on the icon starts listening; only the button does. There is no console unless you pass
+Nothing on the icon starts listening; only the button does. On Windows 11
+the icon asks to stay in the taskbar corner rather than the overflow; if it
+still hides, Settings > Personalization > Taskbar > Other system tray icons. There is no console unless you pass
 `--console`, which attaches one (or the terminal you launched from) and
 prints everything the log gets. Only one instance runs at a time. Built by `.github/workflows/build.yml` on every
 push; a `v*` tag publishes a release.

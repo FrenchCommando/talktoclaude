@@ -28,4 +28,13 @@ void notify(void* window, const std::string& title, const std::string& text);
 // id, or 0. Call from the window's thread.
 unsigned showMenu(void* window);
 
+// Asks Windows 11 to keep the icon in the taskbar corner instead of the
+// overflow. There is no API; the per-icon choice lives in the registry
+// under HKCU\Control Panel\NotifyIconSettings, keyed by exe path, and
+// Explorer creates the entry shortly after the icon is first added. Returns
+// true once the entry exists and IsPromoted is set; call again later if
+// false. Workaround, not a contract: the fallback is Settings >
+// Personalization > Taskbar > Other system tray icons.
+bool promote();
+
 }  // namespace Tray

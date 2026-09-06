@@ -94,6 +94,9 @@ private:
     std::string logDir_;
     void* window_ = nullptr;  // HWND, opaque here
     bool trayAdded_ = false;
+    // Tray::promote() attempts left; Explorer creates the registry entry a
+    // little after the icon appears, so it is retried on the 3s timer.
+    int promoteAttempts_ = 10;
     unsigned long threadId_ = 0;
     // SetTimer with a null window ignores the id you give it and returns a
     // generated one, which is what WM_TIMER's wParam carries. Spelled as

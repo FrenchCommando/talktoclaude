@@ -128,6 +128,45 @@ void notify(void* window, const std::string& title, const std::string& text) {
     Shell_NotifyIconW(NIM_MODIFY, &data);
 }
 
+bool promote() {
+    wchar_t exe[MAX_PATH];
+    const DWORD n = GetModuleFileNameW(nullptr, exe, MAX_PATH);
+    if (n == 0 || n == MAX_PATH) return false;
+
+    HKEY root = nullptr;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Control Panel\\NotifyIconSettings", 0,
+                      KEY_READ, &root) != ERROR_SUCCESS) {
+        return false;
+    }
+    bool done = false;
+    wchar_t name[64];
+    for (DWORD i = 0; !done; ++i) {
+        DWORD nameLen = 64;
+        if (RegEnumKeyExW(root, i, name, &nameLen, nullptr, nullptr, nullptr, nullptr) !=
+            ERROR_SUCCESS) {
+            break;
+        }
+        HKEY entry = nullptr;
+        if (RegOpenKeyExW(root, name, 0, KEY_READ | KEY_SET_VALUE, &entry) != ERROR_SUCCESS) {
+            continue;
+        }
+        wchar_t path[MAX_PATH * 2];
+        DWORD size = sizeof(path);
+        DWORD type = 0;
+        if (RegQueryValueExW(entry, L"ExecutablePath", nullptr, &type,
+                             reinterpret_cast<BYTE*>(path), &size) == ERROR_SUCCESS &&
+            (type == REG_SZ || type == REG_EXPAND_SZ) && _wcsicmp(path, exe) == 0) {
+            const DWORD one = 1;
+            done = RegSetValueExW(entry, L"IsPromoted", 0, REG_DWORD,
+                                  reinterpret_cast<const BYTE*>(&one), sizeof(one)) ==
+                   ERROR_SUCCESS;
+        }
+        RegCloseKey(entry);
+    }
+    RegCloseKey(root);
+    return done;
+}
+
 unsigned showMenu(void* window) {
     const HMENU menu = CreatePopupMenu();
     AppendMenuW(menu, MF_STRING, kMenuOpenLogs, L"Open log folder");

@@ -209,7 +209,12 @@ no symptom pointed at.
   clicking the icon focuses the taskbar, so the window captured for
   injection is the taskbar and the transcript has nowhere to go. Only a
   trigger that leaves focus alone (the headset button, a media key) can
-  start listening. The exe is `WIN32_EXECUTABLE` with `/ENTRY:mainCRTStartup`; there
+  start listening. `Tray::promote()` sets `IsPromoted=1` on the app's
+  entry under `HKCU\Control Panel\NotifyIconSettings` (matched by
+  `ExecutablePath`) so Windows 11 keeps the icon in the corner instead of
+  the overflow; undocumented key, retried on the 3s timer up to 10 times
+  because Explorer creates the entry after the icon appears, and the
+  fallback is the Settings page. Workaround, not an API. The exe is `WIN32_EXECUTABLE` with `/ENTRY:mainCRTStartup`; there
   is no console unless `--console`, which `AttachConsole`s the parent
   terminal or allocates one, and `Log::setConsole(true)`. Consequence for
   scripts: `--help` output goes to the attached console, not a pipe, so CI
