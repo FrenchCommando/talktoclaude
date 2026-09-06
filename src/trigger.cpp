@@ -76,6 +76,16 @@ std::string currentSessionOwner() {
 Trigger* g_trigger = nullptr;
 
 LRESULT CALLBACK probeWndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
+    // "Please close" from an installer (Restart Manager), taskkill without
+    // /F, or logoff. DefWindowProc would destroy the window and leave the
+    // message loop running, so the process never exits and an installer's
+    // "closing applications" step hangs. Quit properly instead.
+    if (message == WM_CLOSE || message == WM_ENDSESSION) {
+        Log::info("[trigger] close requested; quitting\n");
+        PostQuitMessage(0);
+        return 0;
+    }
+    if (message == WM_QUERYENDSESSION) return TRUE;
     if (message == Tray::kCallbackMessage) {
         // NOTIFYICON_VERSION_4: the event is in the low word of lParam.
         if (g_trigger) g_trigger->onTrayEvent(LOWORD(lParam));
