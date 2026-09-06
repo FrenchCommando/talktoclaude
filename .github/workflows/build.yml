@@ -51,7 +51,7 @@ jobs:
       - name: Configure
         run: >
           cmake -B build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_NATIVE=OFF
-          ${{ matrix.arch == 'arm64' && '-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_FLAGS=--target=arm64-pc-windows-msvc "-DCMAKE_CXX_FLAGS=--target=arm64-pc-windows-msvc /EHsc"' || '-DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON' }}
+          ${{ matrix.arch == 'arm64' && '-DCMAKE_SYSTEM_NAME=Windows -DCMAKE_SYSTEM_PROCESSOR=ARM64 -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_RC_COMPILER=rc -DCMAKE_C_FLAGS=--target=arm64-pc-windows-msvc "-DCMAKE_CXX_FLAGS=--target=arm64-pc-windows-msvc /EHsc"' || '-DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON' }}
 
       - name: Build
         run: cmake --build build

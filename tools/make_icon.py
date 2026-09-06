@@ -43,17 +43,14 @@ def sample(px, py):
         return None
     if px < 2 or px > 62 or py < 2 or py > 62:
         return None
-    # Dot.
-    if math.hypot(px - 32, py - 32) <= 14.0:
+    # Dot, left of centre; arcs centred on it, radii 21 and 29, sweeping
+    # 45 degrees either side of horizontal (matches icon.svg). Stroke 3.
+    cx, cy = 26.0, 32.0
+    if math.hypot(px - cx, py - cy) <= 14.0:
         return DOT
-    # Arcs, matching icon.svg's paths: "M46 20 a17 17 0 0 1 0 24" is a
-    # radius-17 arc between (46,20) and (46,44), so its centre is at
-    # x = 46 - sqrt(17^2 - 12^2); likewise the radius-25 arc between
-    # (52,14) and (52,50). Stroke width 3, rounded ends approximated.
-    for radius, cx, half_chord, alpha in ((17.0, 46 - math.sqrt(17**2 - 12**2), 12.0, 0.8),
-                                          (25.0, 52 - math.sqrt(25**2 - 18**2), 18.0, 0.45)):
-        d = math.hypot(px - cx, py - 32)
-        if abs(d - radius) <= 1.5 and px > cx and abs(py - 32) <= half_chord + 1.0:
+    for radius, alpha in ((21.0, 0.8), (29.0, 0.45)):
+        d = math.hypot(px - cx, py - cy)
+        if abs(d - radius) <= 1.5 and abs(math.atan2(py - cy, px - cx)) <= math.pi / 4:
             return tuple(int(BG[i] + (ARC[i] - BG[i]) * alpha) for i in range(3))
     return BG
 
