@@ -168,6 +168,19 @@ can't disagree.
   Local `setup.bat` builds stay native and are fine on their own machine.
 - **Signing:** the exe is unsigned, so SmartScreen warns on first run.
   Deliberate for now; the fix costs a certificate.
+- **TODO (pinned 2026-09-06): Microsoft Store.** Chosen over SignPath
+  Foundation (free but the publisher name would be theirs) because Store
+  installs skip SmartScreen entirely. Blocked on the developer account: a
+  previous signup on another project failed on home-network proxy issues
+  during identity verification; retry on a plain connection. Once through:
+  package as MSIX with `runFullTrust` (SendInput, hotkey, SMTC all keep
+  working), replace the PATH edit with an app execution alias, add a
+  privacy-policy page to the site (required for the microphone
+  capability), and *test whether `Tray::promote()` still reaches Explorer*
+  under MSIX registry virtualisation — it probably won't; fallback is the
+  Settings switch. Store and GitHub releases coexist; the mutex works
+  across both. Every release then goes through Store certification (a day
+  or three); the submission API can automate uploads later.
 
 ## Code layout
 
