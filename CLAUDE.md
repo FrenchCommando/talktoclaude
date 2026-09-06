@@ -192,8 +192,9 @@ can't disagree.
   an SVG stick-figure scene ("Sticky", the user's name for him) driven by
   the same replay script as
   the console demo — phases press/speak/think/type/done toggle a class on
-  the svg root. Transcripts stay verbatim from logs; the one "review" is
-  labelled as not real. Keep it that way: no fabricated testimonials.
+  the svg root. The demo conversation is fiction by request and the page
+  says so; the "milk and clothes" mishear in it is real. The one "review"
+  is labelled as not real. Keep it that way: no fabricated testimonials.
 
 ## Code layout
 

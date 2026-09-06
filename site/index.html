@@ -218,7 +218,7 @@
       <div class="pane"><div class="pane-title">focused window: Claude Code</div><div id="target"></div><div class="prompt-line">&gt; <span id="typed"></span><span class="caret"></span></div></div>
     </div>
   </div>
-  <p class="muted" style="margin-top:8px">Transcripts in the replay are verbatim from real session logs, including the one it got wrong. Timings are the desktop measurements.</p>
+  <p class="muted" style="margin-top:8px">The conversation is made up. The timings are the desktop measurements, and the one it gets wrong is a real mishear from the logs.</p>
 
   <h2>How it works <small>Four steps. Three of them are you.</small></h2>
   <div class="grid">
@@ -290,19 +290,21 @@
         '">All builds</a>, including arm64 and a portable zip.';
     }).catch(() => {});
 
-  // Demo: utterances and timings from real session logs (transcripts verbatim,
-  // including one miss), timings from the desktop measurements.
+  // Demo: a made-up exchange, timed like the desktop measurements. The one
+  // mishear ("the milk and clothes") is real, from the logs.
   const utterances = [
-    { said: 'This works pretty well.', secs: 2.1, took: 0.4, ctx: 256 },
-    { said: 'Are you okay?', secs: 1.6, took: 0.3, ctx: 256 },
-    { said: 'You wrote the same thing twice.', secs: 2.4, took: 0.5, ctx: 256 },
+    { said: "Deploy it. I'm not getting up.", secs: 2.2, took: 0.4, ctx: 256 },
+    { said: 'Why is the build red?', secs: 1.5, took: 0.3, ctx: 256 },
+    { said: 'Give the stick figure a beer belly.', secs: 2.4, took: 0.5, ctx: 256 },
     { said: 'the milk and clothes', secs: 2.6, took: 0.4, ctx: 256, note: 'said: "then commit and close"' },
+    { said: 'Tell my earbuds they did great.', secs: 2.0, took: 0.4, ctx: 256 },
   ];
   const replies = [
-    'Glad to hear it. Anything else?',
-    'All good here. What next?',
-    'You are right, fixed the duplicate.',
-    'I do not have a milk task. Did you mean "then commit and close"?',
+    'Deploying. Stay exactly where you are.',
+    'arm64 wanted clang. It has clang now. Green.',
+    'Belly added. He looks happier already.',
+    'No milk tasks found. Committing and closing anyway.',
+    "Relayed. No reply. They're earbuds.",
   ];
   const con = document.getElementById('console');
   const target = document.getElementById('target');
