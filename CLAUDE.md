@@ -172,15 +172,27 @@ can't disagree.
   Foundation (free but the publisher name would be theirs) because Store
   installs skip SmartScreen entirely. Blocked on the developer account: a
   previous signup on another project failed on home-network proxy issues
-  during identity verification; retry on a plain connection. Once through:
-  package as MSIX with `runFullTrust` (SendInput, hotkey, SMTC all keep
-  working), replace the PATH edit with an app execution alias, add a
-  privacy-policy page to the site (required for the microphone
-  capability), and *test whether `Tray::promote()` still reaches Explorer*
-  under MSIX registry virtualisation — it probably won't; fallback is the
-  Settings switch. Store and GitHub releases coexist; the mutex works
-  across both. Every release then goes through Store certification (a day
-  or three); the submission API can automate uploads later.
+  during identity verification; retry on a plain connection. **Done ahead
+  of the account (2026-09-06):** `msix/AppxManifest.xml` (full trust,
+  microphone capability, app execution alias `talktoclaude` replacing the
+  PATH edit), logo PNGs from `tools/make_icon.py` into `msix/Assets`, CI
+  packs an *unsigned* `.msix` per arch with `makeappx` into `dist/msix`
+  (workflow artifact only, not a release asset — unsigned can't be
+  installed by users; the Store signs it), and `site/privacy.html` for
+  the microphone-capability requirement. Packed locally to validate the
+  manifest. **Still to do once the account exists:** reserve the app name
+  in Partner Center and put its real Identity Name/Publisher into the
+  manifest (placeholders now), upload the artifact, and *test whether
+  `Tray::promote()` still reaches Explorer* under MSIX registry
+  virtualisation — it probably won't; fallback is the Settings switch.
+  Store and GitHub releases coexist; the mutex works across both. Every
+  release then goes through Store certification (a day or three); the
+  submission API can automate uploads later.
+- **Site (2026-09-06):** hype copy at the user's request, stat tiles, and
+  an SVG stick-figure scene ("Marcel") driven by the same replay script as
+  the console demo — phases press/speak/think/type/done toggle a class on
+  the svg root. Transcripts stay verbatim from logs; the one "review" is
+  labelled as not real. Keep it that way: no fabricated testimonials.
 
 ## Code layout
 

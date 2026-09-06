@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest for the Microsoft Store build. Packaged desktop app with
+  full trust, so SendInput, the global hotkey, and the SMTC registration
+  all work as in the plain exe. CI substitutes __VERSION__ (x.y.z.0) and
+  __ARCH__ (x64 | arm64). Identity Name and Publisher are what Partner
+  Center assigns when the app is reserved; the placeholders here are only
+  for local packing and must be replaced before a Store submission.
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  IgnorableNamespaces="uap uap3 rescap desktop">
+
+  <Identity Name="MartialRen.talktoclaude"
+            Publisher="CN=Martial Ren"
+            Version="__VERSION__"
+            ProcessorArchitecture="__ARCH__" />
+
+  <Properties>
+    <DisplayName>talktoclaude</DisplayName>
+    <PublisherDisplayName>Martial Ren</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Press the button on your earbuds, say something, stop talking. It is typed into whatever window has focus. Local speech-to-text, nothing leaves your machine.</Description>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.19041.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="talktoclaude" Executable="talktoclaude.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="talktoclaude"
+        Description="Voice dictation from an earbud button, transcribed locally."
+        BackgroundColor="#1E1E1C"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- `talktoclaude` in any terminal, the packaged replacement for the
+             installer's PATH edit. -->
+        <uap3:Extension Category="windows.appExecutionAlias" Executable="talktoclaude.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="talktoclaude.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <DeviceCapability Name="microphone" />
+  </Capabilities>
+</Package>

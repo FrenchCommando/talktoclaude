@@ -86,6 +86,25 @@ jobs:
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DArch=${{ matrix.arch }} /DSrc=..\stage\${{ matrix.arch }} /DVersion=${{ steps.ver.outputs.version }} installer\talktoclaude.iss
           Get-ChildItem dist
 
+      # Unsigned MSIX for Microsoft Store submission (the Store signs it).
+      # Not attached to releases: an unsigned package can't be installed by
+      # end users. Kept as a workflow artifact under dist/msix.
+      - name: MSIX
+        shell: pwsh
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          $v4 = if ($v -match '^\d+\.\d+\.\d+$') { "$v.0" } else { "0.0.0.0" }
+          $st = "stage\msix-${{ matrix.arch }}"
+          New-Item -ItemType Directory -Force "$st\Assets" | Out-Null
+          Copy-Item build\talktoclaude.exe, build\*.dll $st
+          Copy-Item msix\Assets\* "$st\Assets"
+          (Get-Content msix\AppxManifest.xml -Raw).Replace("__VERSION__", $v4).Replace("__ARCH__", "${{ matrix.arch }}") | Set-Content -Encoding utf8 "$st\AppxManifest.xml"
+          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" | Sort-Object FullName | Select-Object -Last 1
+          New-Item -ItemType Directory -Force dist\msix | Out-Null
+          & $makeappx.FullName pack /d $st /p "dist\msix\talktoclaude-$v-windows-${{ matrix.arch }}-unsigned.msix" /o
+          if ($LASTEXITCODE -ne 0) { throw "makeappx failed" }
+          Get-ChildItem dist\msix
+
       - uses: actions/upload-artifact@v4
         with:
           name: talktoclaude-windows-${{ matrix.arch }}
@@ -96,5 +115,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: |
+            dist/*.zip
+            dist/*.exe
           generate_release_notes: true

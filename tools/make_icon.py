@@ -1,13 +1,23 @@
-"""Renders talktoclaude.ico (16/24/32/48/64/256) from the same design as
-site/icon.svg: dark rounded square, red dot, two sound arcs. Standard
-library only, so it runs anywhere; the output is committed and only needs
-regenerating if the design changes.
+"""Renders talktoclaude.ico (16/24/32/48/64/256) and the MSIX logo PNGs
+(msix/Assets) from the same design as site/icon.svg: dark rounded square,
+red dot, two sound arcs. Standard library only, so it runs anywhere; the
+output is committed and only needs regenerating if the design changes.
 
     python tools/make_icon.py
 """
 import math
 import struct
+import zlib
 from pathlib import Path
+
+# MSIX logo assets: name -> (width, height). The icon is drawn centred at
+# the smaller dimension; the wide tile pads with the tile background.
+MSIX_ASSETS = {
+    "Square44x44Logo.png": (44, 44),
+    "Square150x150Logo.png": (150, 150),
+    "StoreLogo.png": (50, 50),
+    "Wide310x150Logo.png": (310, 150),
+}
 
 BG = (0x1E, 0x1E, 0x1C)
 DOT = (0xDC, 0x3C, 0x32)
@@ -74,7 +84,41 @@ def image(size):
     return header + b"".join(rows) + mask_row * size
 
 
+def png(width, height):
+    """Straight-alpha RGBA PNG; the icon is centred at min(width, height)."""
+    size = min(width, height)
+    ox, oy = (width - size) // 2, (height - size) // 2
+    raw = bytearray()
+    for y in range(height):
+        raw.append(0)  # filter: none
+        for x in range(width):
+            if ox <= x < ox + size and oy <= y < oy + size:
+                r, g, b, a = coverage(x - ox, y - oy, size)
+                if a:
+                    r, g, b = (min(255, r * 255 // a), min(255, g * 255 // a),
+                               min(255, b * 255 // a))
+                raw += bytes((r, g, b, a))
+            else:
+                raw += b"\x00\x00\x00\x00"
+
+    def chunk(kind, data):
+        body = kind + data
+        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+    return (b"\x89PNG\r\n\x1a\n" +
+            chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)) +
+            chunk(b"IDAT", zlib.compress(bytes(raw), 9)) +
+            chunk(b"IEND", b""))
+
+
 def main():
+    root = Path(__file__).resolve().parent.parent
+    assets = root / "msix" / "Assets"
+    assets.mkdir(parents=True, exist_ok=True)
+    for name, (w, h) in MSIX_ASSETS.items():
+        (assets / name).write_bytes(png(w, h))
+        print(f"wrote {assets / name}")
+
     images = [(s, image(s)) for s in SIZES]
     out = bytearray(struct.pack("<HHH", 0, 1, len(images)))
     offset = 6 + 16 * len(images)
@@ -83,7 +127,7 @@ def main():
         offset += len(data)
     for _, data in images:
         out += data
-    dest = Path(__file__).resolve().parent.parent / "talktoclaude.ico"
+    dest = root / "talktoclaude.ico"
     dest.write_bytes(out)
     print(f"wrote {dest} ({len(out)} bytes)")
 

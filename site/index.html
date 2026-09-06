@@ -7,60 +7,103 @@
 <meta name="description" content="Press the button on your earbuds, say something, and it is typed into whatever window has focus. Local speech-to-text for Windows, one exe.">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <meta property="og:title" content="talktoclaude">
-<meta property="og:description" content="Press the button on your earbuds, say something, stop talking. It gets typed. Local, Windows, one exe.">
+<meta property="og:description" content="Say it. It's typed. Nothing leaves the room. Voice dictation for Windows from an earbud button, transcribed on your own CPU.">
 <meta property="og:image" content="https://frenchcommando.github.io/talktoclaude/icon.svg">
 <style>
   :root {
     --bg: #f7f6f2; --fg: #1c1b18; --muted: #6b6860; --line: #e2dfd6;
-    --card: #ffffff; --accent: #b4552f; --accent-fg: #ffffff;
+    --card: #ffffff; --accent: #b4552f; --accent-fg: #ffffff; --glow: rgba(180,85,47,.18);
     --term-bg: #1e1e1c; --term-fg: #d8d4c8; --term-dim: #8a867a; --term-hi: #f2c14e; --term-ok: #8fc98b;
-    --pane-bg: #23231f; --caret: #8fc98b;
+    --pane-bg: #23231f; --caret: #8fc98b; --red: #dc3c32; --amber: #f0b428; --grey: #8c8c8c;
     color-scheme: light dark;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #151513; --fg: #e8e5dc; --muted: #9a968b; --line: #2a2a26;
-      --card: #1d1d1a; --accent: #e0805a; --accent-fg: #151513;
+      --card: #1d1d1a; --accent: #e0805a; --accent-fg: #151513; --glow: rgba(224,128,90,.16);
     }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--fg);
     font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 860px; margin: 0 auto; padding: 48px 20px 80px; }
-  h1 { font-size: 2.6rem; letter-spacing: -0.02em; margin: 0 0 8px; display: flex; align-items: center; gap: 14px; }
-  h1 img { width: 44px; height: 44px; border-radius: 10px; }
-  h2 { font-size: 1.35rem; margin: 56px 0 12px; letter-spacing: -0.01em; }
+  main { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 3.4rem; letter-spacing: -0.03em; margin: 0 0 6px; display: flex; align-items: center; gap: 16px; line-height: 1.05; }
+  h1 img { width: 56px; height: 56px; border-radius: 13px; box-shadow: 0 0 0 6px var(--glow); }
+  h2 { font-size: 1.5rem; margin: 64px 0 12px; letter-spacing: -0.01em; }
+  h2 small { display: block; font-size: .9rem; font-weight: 400; color: var(--muted); margin-top: 2px; }
   p { margin: 0 0 12px; }
-  .lede { font-size: 1.2rem; max-width: 620px; }
+  .tagline { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; margin: 14px 0 8px; max-width: 700px; line-height: 1.2; }
+  .tagline em { color: var(--accent); font-style: normal; }
+  .lede { font-size: 1.15rem; max-width: 640px; color: var(--muted); }
   .muted { color: var(--muted); }
   a { color: var(--accent); }
   .cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin: 24px 0 8px; }
-  .btn { display: inline-block; padding: 12px 20px; border-radius: 8px; font-weight: 600;
-    text-decoration: none; background: var(--accent); color: var(--accent-fg); border: 0; cursor: pointer; font-size: 1rem; }
-  .btn.alt { background: transparent; color: var(--fg); border: 1px solid var(--line); }
+  .btn { display: inline-block; padding: 13px 22px; border-radius: 9px; font-weight: 700;
+    text-decoration: none; background: var(--accent); color: var(--accent-fg); border: 0; cursor: pointer; font-size: 1rem;
+    box-shadow: 0 6px 24px var(--glow); }
+  .btn.alt { background: transparent; color: var(--fg); border: 1px solid var(--line); box-shadow: none; }
   .btn:disabled { opacity: .6; cursor: default; }
-  .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .tag { font-size: .8rem; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 36px; }
+  .stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .stat .n { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; color: var(--accent); line-height: 1; font-variant-numeric: tabular-nums; }
+  .stat .l { color: var(--muted); font-size: .9rem; margin-top: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
   .card b { display: block; margin-bottom: 4px; }
-  .card .n { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
   code, pre { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .92em; }
   code { background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
-  pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; }
-  pre code { background: none; border: 0; padding: 0; }
   ul { padding-left: 20px; } li { margin-bottom: 6px; }
   table { border-collapse: collapse; width: 100%; font-size: .95rem; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
   th { color: var(--muted); font-weight: 600; }
   .tbl { overflow-x: auto; }
+  blockquote { margin: 0; padding: 14px 18px; border-left: 3px solid var(--accent); background: var(--card); border-radius: 0 10px 10px 0; }
+  blockquote footer { color: var(--muted); font-size: .9rem; margin-top: 6px; }
 
-  /* demo */
-  .demo { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--term-bg); color: var(--term-fg); }
+  /* scene */
+  .scene { border: 1px solid var(--line); border-radius: 14px; background: var(--card); padding: 8px 8px 0; overflow: hidden; }
+  .scene svg { width: 100%; height: auto; display: block; }
+  .scene .cap { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 8px 12px; color: var(--muted); font-size: .9rem; flex-wrap: wrap; }
+  .stroke { stroke: var(--fg); stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .fill { fill: var(--fg); }
+  #arm-up { opacity: 0; } #arm-rest { opacity: 1; }
+  #arm-up, #arm-rest { transition: opacity .25s; }
+  .phase-press #arm-up, .phase-speak #arm-up { opacity: 1; }
+  .phase-press #arm-rest, .phase-speak #arm-rest { opacity: 0; }
+  #mouth { transform-origin: 250px 86px; }
+  .phase-speak #mouth { animation: talk .28s ease-in-out infinite alternate; }
+  @keyframes talk { from { transform: scaleY(.3); } to { transform: scaleY(1.6); } }
+  .wave { opacity: 0; stroke: var(--accent); }
+  .phase-speak .wave { animation: wave 1.1s ease-out infinite; }
+  .phase-speak .wave:nth-child(2) { animation-delay: .25s; }
+  .phase-speak .wave:nth-child(3) { animation-delay: .5s; }
+  @keyframes wave { 0% { opacity: 0; transform: translateX(0); } 20% { opacity: 1; } 100% { opacity: 0; transform: translateX(120px); } }
+  #tap { opacity: 0; fill: none; stroke: var(--accent); stroke-width: 2; }
+  .phase-press #tap { animation: tap .6s ease-out 1; }
+  @keyframes tap { 0% { opacity: 1; r: 4; } 100% { opacity: 0; r: 22; } }
+  #dot { fill: var(--grey); transition: fill .2s; }
+  .phase-press #dot, .phase-speak #dot { fill: var(--red); }
+  .phase-think #dot { fill: var(--amber); }
+  #screentext { font: 600 13px ui-monospace, "Cascadia Mono", Consolas, monospace; fill: var(--term-fg); }
+  #screencaret { fill: var(--caret); animation: blink 1s steps(1) infinite; }
+  #reply { font: 12px ui-monospace, "Cascadia Mono", Consolas, monospace; fill: var(--term-dim); opacity: 0; transition: opacity .3s; }
+  .phase-done #reply { opacity: 1; }
+  #thought { opacity: 0; transition: opacity .2s; }
+  .phase-think #thought { opacity: 1; }
+  #thought circle { fill: var(--amber); animation: pulse .5s ease-in-out infinite alternate; }
+  #thought circle:nth-child(2) { animation-delay: .15s; } #thought circle:nth-child(3) { animation-delay: .3s; }
+  @keyframes pulse { from { opacity: .3; } to { opacity: 1; } }
+  .zzz { font: italic 14px system-ui; fill: var(--muted); opacity: 1; transition: opacity .2s; }
+  .phase-press .zzz, .phase-speak .zzz, .phase-think .zzz, .phase-done .zzz { opacity: 0; }
+
+  /* console demo */
+  .demo { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--term-bg); color: var(--term-fg); margin-top: 14px; }
   .demo-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px;
     border-bottom: 1px solid #333; font-size: .85rem; color: var(--term-dim); flex-wrap: wrap; }
-  .demo-bar .btn { padding: 8px 14px; font-size: .9rem; }
-  .panes { display: grid; grid-template-columns: 1fr 1fr; min-height: 300px; }
+  .demo-bar .btn { padding: 8px 14px; font-size: .9rem; box-shadow: none; }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; min-height: 260px; }
   @media (max-width: 640px) { .panes { grid-template-columns: 1fr; } }
   .pane { padding: 12px 14px; font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .82rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
   .pane + .pane { border-left: 1px solid #333; background: var(--pane-bg); }
@@ -78,12 +121,13 @@
 <body>
 <main>
   <h1><img src="icon.svg" alt="">talktoclaude</h1>
-  <p class="lede">Press the button on your earbuds, say something, stop talking. It gets typed into whatever window has focus, and Enter is pressed. Built to talk to Claude Code from across the room.</p>
+  <p class="tagline">Say it. It's typed. <em>Nothing leaves the room.</em></p>
+  <p class="lede">Press the button on your earbuds, say something, stop talking. It gets typed into whatever window has focus, and Enter is pressed. Built to talk to Claude Code from the couch. No cloud, no account, no subscription, no waiting.</p>
   <div class="cta">
     <a class="btn" id="dl" href="https://github.com/FrenchCommando/talktoclaude/releases/latest">Download for Windows</a>
     <a class="btn alt" href="https://github.com/FrenchCommando/talktoclaude">Source on GitHub</a>
   </div>
-  <p class="muted" id="dl-note">Windows 11, x64 and arm64. Per-user installer, no admin; a portable zip is on the same page. Speech never leaves your machine.</p>
+  <p class="muted" id="dl-note">Windows 11, x64 and arm64. Per-user installer, no admin; a portable zip is on the same page.</p>
   <div class="tags">
     <span class="tag">whisper.cpp, on the CPU</span>
     <span class="tag">no cloud, no account</span>
@@ -91,48 +135,112 @@
     <span class="tag">MIT licensed</span>
   </div>
 
-  <h2>What it looks like</h2>
-  <p class="muted">A replay of a real session. The left pane is talktoclaude's console, the right is the window that had focus. Press the button to run it.</p>
-  <div class="demo" id="demo">
-    <div class="demo-bar">
+  <div class="stats">
+    <div class="stat"><div class="n">0 B</div><div class="l">of your voice uploaded. Ever.</div></div>
+    <div class="stat"><div class="n">0.4 s</div><div class="l">from silence to typed text, on a desktop CPU</div></div>
+    <div class="stat"><div class="n">1</div><div class="l">button. The one already on your earbuds.</div></div>
+    <div class="stat"><div class="n">0</div><div class="l">accounts, subscriptions, dashboards, onboarding flows</div></div>
+  </div>
+
+  <h2>Watch it happen <small>Press the button. Meet Marcel. Marcel has earbuds and opinions.</small></h2>
+  <div class="scene">
+    <svg id="scene" viewBox="0 0 900 260" role="img" aria-label="A stick figure taps an earbud, speaks, and the words appear on a laptop across the room.">
+      <!-- floor -->
+      <line class="stroke" x1="20" y1="240" x2="880" y2="240" opacity=".35"/>
+      <!-- Marcel -->
+      <g id="marcel">
+        <circle class="stroke" cx="250" cy="70" r="24"/>
+        <circle class="fill" cx="243" cy="64" r="2"/>
+        <path id="mouth" class="stroke" d="M243 84 q7 4 14 0"/>
+        <!-- earbud -->
+        <circle class="fill" cx="272" cy="72" r="4" style="fill: var(--accent)"/>
+        <circle id="tap" cx="272" cy="72" r="4"/>
+        <!-- body -->
+        <line class="stroke" x1="250" y1="94" x2="250" y2="170"/>
+        <!-- left arm (static) -->
+        <path class="stroke" d="M250 112 L215 150"/>
+        <!-- right arm: two poses, resting and hand on the earbud -->
+        <path id="arm-rest" class="stroke" d="M250 112 L268 140 L282 166"/>
+        <path id="arm-up" class="stroke" d="M250 112 L278 100 L276 80"/>
+        <!-- legs -->
+        <path class="stroke" d="M250 170 L228 238 M250 170 L272 238"/>
+        <!-- sound waves -->
+        <g transform="translate(290 70)">
+          <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
+          <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
+          <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
+        </g>
+        <text class="zzz" x="290" y="40">…couch mode…</text>
+      </g>
+      <!-- laptop -->
+      <g id="laptop" transform="translate(560 100)">
+        <rect x="0" y="0" width="300" height="120" rx="8" fill="#1e1e1c" stroke="#3a3a36" stroke-width="3"/>
+        <rect x="10" y="10" width="280" height="100" rx="4" fill="#23231f"/>
+        <path d="M-20 138 L320 138 L300 122 L0 122 Z" fill="#2b2b28" stroke="#3a3a36" stroke-width="2"/>
+        <!-- tray dot -->
+        <circle id="dot" cx="278" cy="98" r="5"/>
+        <text id="screentext" x="22" y="42"><tspan class="dim" fill="#8a867a">&gt; </tspan><tspan id="typedsvg"></tspan></text>
+        <rect id="screencaret" x="0" y="31" width="7" height="14"/>
+        <text id="reply" x="22" y="66"></text>
+        <g id="thought" transform="translate(40 84)">
+          <circle cx="0" cy="0" r="4"/><circle cx="14" cy="0" r="4"/><circle cx="28" cy="0" r="4"/>
+        </g>
+      </g>
+      <!-- across the room -->
+      <text x="330" y="232" class="zzz" style="opacity:.7">← 4 metres, one thin wall, zero cables →</text>
+    </svg>
+    <div class="cap">
       <span id="demo-status">Pixel Buds paired · base.en loaded · button owned by talktoclaude.exe</span>
       <span>
         <button class="btn pressbtn" id="press" title="Simulate the earbud play/pause press">⏯ Press</button>
         <button class="btn alt" id="replay">Replay all</button>
       </span>
     </div>
+  </div>
+  <div class="demo" id="demo">
     <div class="panes">
       <div class="pane"><div class="pane-title">talktoclaude --console</div><div id="console"><span class="dim">talktoclaude ready. Press Play/Pause to talk; recording ends itself after ~1.5s of silence.</span>
 </div></div>
       <div class="pane"><div class="pane-title">focused window: Claude Code</div><div id="target"></div><div class="prompt-line">&gt; <span id="typed"></span><span class="caret"></span></div></div>
     </div>
   </div>
+  <p class="muted" style="margin-top:8px">Transcripts in the replay are verbatim from real session logs, including the one it got wrong. Timings are the desktop measurements.</p>
 
-  <h2>How it works</h2>
+  <h2>How it works <small>Four steps. Three of them are you.</small></h2>
   <div class="grid">
-    <div class="card"><b>1. Press</b>The play/pause button on any Bluetooth earbuds, or a keyboard media key. Windows routes it through the media-session API, and talktoclaude holds that session.</div>
-    <div class="card"><b>2. Speak</b>The mic opens on the press. Say what you want typed.</div>
-    <div class="card"><b>3. Stop talking</b>About 1.5 seconds of silence ends the utterance. No second press needed, which matters because some Bluetooth stacks deliver none while the mic is open.</div>
-    <div class="card"><b>4. Typed</b>whisper.cpp transcribes locally, the text is typed into the focused window, and Enter submits it. If focus moved while you spoke, nothing is typed.</div>
+    <div class="card"><b>1. Press</b>The play/pause button on any Bluetooth earbuds, or a keyboard media key. Windows routes it through the media-session API, and talktoclaude holds that session like it holds a grudge.</div>
+    <div class="card"><b>2. Speak</b>The mic opens on the press. Say what you want typed. Full sentences, punctuation included, courtesy of the model.</div>
+    <div class="card"><b>3. Stop talking</b>About 1.5 seconds of silence ends the utterance. No second press, because some Bluetooth stacks deliver none while the mic is open, and because you shouldn't have to.</div>
+    <div class="card"><b>4. Typed</b>whisper.cpp transcribes on your CPU, the text lands in the focused window, Enter submits it. If focus moved while you spoke, nothing is typed anywhere.</div>
   </div>
 
-  <h2>Get it running</h2>
+  <h2>Why this is slightly absurd <small>and why it works anyway</small></h2>
+  <ul>
+    <li><b>Zero latency to the cloud</b>, because there is no cloud. The round trip is from your mouth to your CPU.</li>
+    <li><b>Enterprise grade? No. Living-room grade.</b> It has to survive a Bluetooth stack, a headset that won't send a second press, and a model that thinks "then commit and close" is "the milk and clothes". It does, mostly.</li>
+    <li><b>Trained on nothing of yours.</b> The model is whisper base.en, downloaded once. Your audio is decoded and forgotten in under a second.</li>
+    <li><b>One exe, four DLLs, no runtime.</b> No Python, no Electron, no 400 MB "helper". The installer is 2.7 MB.</li>
+    <li><b>Open source, MIT.</b> Every workaround is documented, including the ones that didn't work. Especially those.</li>
+  </ul>
+  <blockquote>"Finally, an app that respects my one button."<footer>The Pixel Buds. Not a real review. They can't type. That's the whole point.</footer></blockquote>
+
+  <h2>Get it running <small>Under a minute, plus one model download.</small></h2>
   <ol>
     <li>Run the installer. It goes into your user profile and onto your PATH, no admin prompt. Or unzip the portable build anywhere.</li>
     <li>Type <code>talktoclaude</code> in any terminal, or open it from the Start menu. It lives in the notification area: grey when ready, red while listening, amber while transcribing. The first run fetches the speech model (142 MB) into your local app data.</li>
     <li>Pair your earbuds. If Windows offers "Use LE Audio when available", turn it off: the buds have to sit in classic Bluetooth for the button to arrive.</li>
     <li>Focus the window you want to talk into, press the button, speak.</li>
   </ol>
-  <p class="muted">Click the icon to quit or open the logs. Ctrl+Alt+V takes the media button back if another app grabbed it. <code>talktoclaude path\to\other-model.bin</code> tries a different whisper model; <code>--console</code> shows the log live.</p>
+  <p class="muted">Click the icon to quit or open the logs. Ctrl+Alt+V takes the media button back if another app grabbed it. <code>talktoclaude path\to\other-model.bin</code> tries a different whisper model; <code>--console</code> shows the log live. Windows will warn about an unknown publisher the first time: "More info", then "Run anyway". A Store listing is on the way.</p>
 
-  <h2>Numbers</h2>
+  <h2>Numbers <small>Measured, not marketed. Well, measured then marketed.</small></h2>
   <div class="tbl"><table>
     <tr><th>Machine</th><th>Model</th><th>Transcription time</th></tr>
     <tr><td>Ryzen 9 9950X3D, 32 threads</td><td>base.en</td><td>0.2 to 0.5 s per utterance, about 5x faster than you spoke</td></tr>
     <tr><td>Ryzen 9 9950X3D, 32 threads</td><td>small.en</td><td>1.2 to 1.5 s per utterance</td></tr>
     <tr><td>i7-8550U laptop, 8 threads</td><td>base.en</td><td>about as long as you spoke</td></tr>
   </table></div>
-  <p class="muted">CPU only. Short utterances through an earbud mic are where base.en misses words; that is the trade for sub-second latency. <code>run-small.bat</code> tries the larger model.</p>
+  <p class="muted">CPU only. Short utterances through an earbud mic are where base.en misses words; that is the trade for sub-second latency.</p>
 
   <h2>Things to know</h2>
   <ul>
@@ -144,14 +252,14 @@
   </ul>
 
   <h2>Under the hood</h2>
-  <p>About 1,500 lines of C++ in six files, with whisper.cpp linked in. WASAPI captures the mic and downmixes to 16 kHz mono. A hidden window registers a System Media Transport Controls session so the earbud press is delivered to it. Silence either side of the speech is trimmed before decoding, and the encoder context is shrunk to fit the audio, which is most of the speed. The design notes, including what did not work and why, are in <a href="https://github.com/FrenchCommando/talktoclaude/blob/master/CLAUDE.md">CLAUDE.md</a>.</p>
+  <p>About 1,900 lines of C++ in eight files, with whisper.cpp linked in. WASAPI captures the mic and downmixes to 16 kHz mono. A hidden window registers a System Media Transport Controls session so the earbud press is delivered to it. Silence either side of the speech is trimmed before decoding, and the encoder context is shrunk to fit the audio, which is most of the speed. The design notes, including what did not work and why, are in <a href="https://github.com/FrenchCommando/talktoclaude/blob/master/CLAUDE.md">CLAUDE.md</a>.</p>
 
-  <footer>talktoclaude · <a href="https://github.com/FrenchCommando/talktoclaude">github.com/FrenchCommando/talktoclaude</a> · <a href="https://github.com/FrenchCommando/talktoclaude/blob/master/LICENSE">MIT</a></footer>
+  <footer>talktoclaude · <a href="https://github.com/FrenchCommando/talktoclaude">github.com/FrenchCommando/talktoclaude</a> · <a href="https://github.com/FrenchCommando/talktoclaude/blob/master/LICENSE">MIT</a> · <a href="privacy.html">privacy</a></footer>
 </main>
 
 <script>
 (function () {
-  // Latest release: swap the download link for the direct zip when the API answers.
+  // Latest release: swap the download link for the direct installer when the API answers.
   const arch = (navigator.userAgentData && navigator.userAgentData.architecture === 'arm') ? 'arm64' : 'x64';
   fetch('https://api.github.com/repos/FrenchCommando/talktoclaude/releases/latest')
     .then(r => r.ok ? r.json() : null)
@@ -165,7 +273,7 @@
       dl.textContent = 'Download ' + rel.tag_name + ' for Windows ' + arch;
       document.getElementById('dl-note').innerHTML =
         (asset.size / 1048576).toFixed(1) + ' MB installer, per-user, no admin. <a href="' + rel.html_url +
-        '">All builds</a>, including arm64 and a portable zip. Speech never leaves your machine.';
+        '">All builds</a>, including arm64 and a portable zip.';
     }).catch(() => {});
 
   // Demo: utterances and timings from real session logs (transcripts verbatim,
@@ -187,36 +295,56 @@
   const typed = document.getElementById('typed');
   const press = document.getElementById('press');
   const replay = document.getElementById('replay');
+  const scene = document.getElementById('scene');
+  const typedSvg = document.getElementById('typedsvg');
+  const screenText = document.getElementById('screentext');
+  const screenCaret = document.getElementById('screencaret');
+  const replySvg = document.getElementById('reply');
   let idx = 0, busy = false;
   const wait = ms => new Promise(r => setTimeout(r, ms));
+  const phase = p => { scene.className.baseVal = p ? 'phase-' + p : ''; };
   const line = (html, cls) => {
     const d = document.createElement('div');
     if (cls) d.className = cls;
     d.innerHTML = html;
     con.appendChild(d);
     con.parentElement.scrollTop = con.parentElement.scrollHeight;
-    while (con.children.length > 14) con.removeChild(con.firstChild);
+    while (con.children.length > 12) con.removeChild(con.firstChild);
   };
+  const moveCaret = () => {
+    try { const b = screenText.getBBox(); screenCaret.setAttribute('x', b.x + b.width + 2); } catch (e) {}
+  };
+  moveCaret();
 
   async function one(u, reply) {
     busy = true; press.disabled = true;
+    replySvg.textContent = ''; typedSvg.textContent = ''; moveCaret();
+    phase('press');
     line('[smtc button pressed: 1]', 'dim');
     line('[listening...]', 'hi');
+    await wait(500);
+    phase('speak');
     await wait(u.secs * 1000 * 0.6);           // "speaking", compressed
     await wait(900);                            // trailing silence, compressed
+    phase('think');
     line('[auto-stop: trailing silence]', 'dim');
     line(`[captured ${(u.secs + 1.5).toFixed(1)}s, kept ${u.secs.toFixed(1)}s, peak 0.18]`, 'dim');
     line('[transcribing...]', 'dim');
-    await wait(u.took * 1000);
+    await wait(u.took * 1000 + 300);
     line(`[${u.secs.toFixed(1)}s audio in ${u.took.toFixed(1)}s (${(u.secs / u.took).toFixed(1)}x spoken length), audio_ctx ${u.ctx}/1500, 32 threads]`, 'dim');
     line('&gt; ' + u.said + (u.note ? ` <span class="dim">(${u.note})</span>` : ''), 'ok');
-    for (const ch of u.said) { typed.textContent += ch; await wait(18); }
+    phase('type');
+    for (const ch of u.said) { typed.textContent += ch; typedSvg.textContent += ch; moveCaret(); await wait(22); }
     await wait(250);
     const d = document.createElement('div');
     d.innerHTML = '<span class="dim">&gt;</span> ' + u.said.replace(/</g, '&lt;') + '<div class="reply">' + reply + '</div>';
     target.appendChild(d);
     typed.textContent = '';
-    while (target.children.length > 4) target.removeChild(target.firstChild);
+    while (target.children.length > 3) target.removeChild(target.firstChild);
+    replySvg.textContent = reply.length > 36 ? reply.slice(0, 35) + '…' : reply;
+    phase('done');
+    await wait(1200);
+    phase('');
     busy = false; press.disabled = false;
   }
 
@@ -230,7 +358,7 @@
     con.innerHTML = ''; target.innerHTML = ''; idx = 0;
     for (let i = 0; i < utterances.length; i++) {
       await one(utterances[i], replies[i]);
-      await wait(700);
+      await wait(500);
       idx = i + 1;
     }
   });
