@@ -144,7 +144,7 @@
 
   <h2>Watch it happen <small>Press the button. Meet Sticky. Sticky has earbuds and opinions.</small></h2>
   <div class="scene">
-    <svg id="scene" viewBox="0 0 900 268" role="img" aria-label="A stick figure slouched on a couch taps an earbud, speaks, and the words appear on a laptop across the room.">
+    <svg id="scene" viewBox="0 0 900 268" role="img" aria-label="A stick figure slouched on a couch with a laptop on his belly taps an earbud and speaks; a zoomed view of the laptop screen shows the words being typed.">
       <!-- floor -->
       <line class="stroke" x1="20" y1="240" x2="880" y2="240" opacity=".35"/>
       <!-- couch -->
@@ -175,6 +175,10 @@
         <!-- legs: straight out, ankles crossed, feet up on the footstool -->
         <path class="stroke" d="M244 198 L300 196 L346 210 L352 202"/>
         <path class="stroke" d="M244 198 L296 204 L334 204 L342 212"/>
+        <!-- laptop on the belly: base along the curve, screen tilted back at him -->
+        <path d="M232 166 L272 162 L274 168 L234 172 Z" fill="#2b2b28" stroke="#3a3a36" stroke-width="2"/>
+        <path d="M272 162 L278 163 L266 128 L260 127 Z" fill="#1e1e1c" stroke="#3a3a36" stroke-width="2"/>
+        <path d="M270 158 L275 159 L266 132 L261 131 Z" fill="#23231f"/>
         <!-- sound waves -->
         <g transform="translate(226 122)">
           <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
@@ -183,11 +187,11 @@
         </g>
         <text class="zzz" x="236" y="94">…couch mode…</text>
       </g>
-      <!-- laptop -->
+      <!-- zoom callout: the small screen, enlarged -->
+      <path d="M266 128 L560 100 M278 163 L560 220" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="5 6" fill="none" opacity=".6"/>
       <g id="laptop" transform="translate(560 100)">
         <rect x="0" y="0" width="300" height="120" rx="8" fill="#1e1e1c" stroke="#3a3a36" stroke-width="3"/>
         <rect x="10" y="10" width="280" height="100" rx="4" fill="#23231f"/>
-        <path d="M-20 138 L320 138 L300 122 L0 122 Z" fill="#2b2b28" stroke="#3a3a36" stroke-width="2"/>
         <!-- tray dot -->
         <circle id="dot" cx="278" cy="98" r="5"/>
         <text id="screentext" x="22" y="42"><tspan class="dim" fill="#8a867a">&gt; </tspan><tspan id="typedsvg"></tspan></text>
@@ -198,7 +202,7 @@
         </g>
       </g>
       <!-- across the room -->
-      <text x="380" y="254" class="zzz" style="opacity:.7">← 4 metres, one thin wall, zero cables →</text>
+      <text x="600" y="248" class="zzz" style="opacity:.7">his screen, zoomed. The dot is the tray icon.</text>
     </svg>
     <div class="cap">
       <span id="demo-status">Pixel Buds paired · base.en loaded · button owned by talktoclaude.exe</span>
