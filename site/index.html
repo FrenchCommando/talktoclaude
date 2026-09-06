@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>talktoclaude</title>
 <meta name="description" content="Press the button on your earbuds, say something, and it is typed into whatever window has focus. Local speech-to-text for Windows, one exe.">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<meta property="og:title" content="talktoclaude">
+<meta property="og:description" content="Press the button on your earbuds, say something, stop talking. It gets typed. Local, Windows, one exe.">
+<meta property="og:image" content="https://frenchcommando.github.io/talktoclaude/icon.svg">
 <style>
   :root {
     --bg: #f7f6f2; --fg: #1c1b18; --muted: #6b6860; --line: #e2dfd6;
@@ -23,7 +27,8 @@
   body { margin: 0; background: var(--bg); color: var(--fg);
     font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width: 860px; margin: 0 auto; padding: 48px 20px 80px; }
-  h1 { font-size: 2.6rem; letter-spacing: -0.02em; margin: 0 0 8px; }
+  h1 { font-size: 2.6rem; letter-spacing: -0.02em; margin: 0 0 8px; display: flex; align-items: center; gap: 14px; }
+  h1 img { width: 44px; height: 44px; border-radius: 10px; }
   h2 { font-size: 1.35rem; margin: 56px 0 12px; letter-spacing: -0.01em; }
   p { margin: 0 0 12px; }
   .lede { font-size: 1.2rem; max-width: 620px; }
@@ -72,7 +77,7 @@
 </head>
 <body>
 <main>
-  <h1>talktoclaude</h1>
+  <h1><img src="icon.svg" alt="">talktoclaude</h1>
   <p class="lede">Press the button on your earbuds, say something, stop talking. It gets typed into whatever window has focus, and Enter is pressed. Built to talk to Claude Code from across the room.</p>
   <div class="cta">
     <a class="btn" id="dl" href="https://github.com/FrenchCommando/talktoclaude/releases/latest">Download for Windows</a>
