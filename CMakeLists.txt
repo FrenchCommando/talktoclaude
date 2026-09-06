@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(talktoclaude LANGUAGES CXX)
+project(talktoclaude LANGUAGES CXX RC)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -51,6 +51,7 @@ add_executable(talktoclaude
     src/text_injector.cpp
     src/transcriber.cpp
     src/tray.cpp
+    src/talktoclaude.rc
 )
 
 # A tray app: no console window of its own (--console attaches one). The

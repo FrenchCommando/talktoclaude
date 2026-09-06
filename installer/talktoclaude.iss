@@ -32,6 +32,7 @@ Compression=lzma2
 SolidCompression=yes
 ChangesEnvironment=yes
 UninstallDisplayIcon={app}\talktoclaude.exe
+SetupIconFile=..\talktoclaude.ico
 LicenseFile={#Src}\LICENSE
 #if Arch == "arm64"
 ArchitecturesAllowed=arm64

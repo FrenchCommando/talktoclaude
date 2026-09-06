@@ -1,0 +1,3 @@
+// Application icon (Explorer, Start menu, installer). The tray uses its own
+// runtime-drawn state discs; see tray.cpp.
+1 ICON "../talktoclaude.ico"
