@@ -109,6 +109,13 @@ can't disagree.
 - **A running app blocks the build** — Windows locks the .exe, so the link
   step fails. `tasklist | grep -i talktoclaude`, then `taskkill //PID <pid>
   //F`. Say so before killing it; dictation may be in progress.
+- **Never launch a dev build while the installed app is running.** Both
+  register as the media session and re-assert it every 3s, so they fight
+  over the button and both type the same press. Happened 2026-09-06: the
+  installed v0.1.1 (no single-instance guard) was up, a dev instance was
+  started for a test, and the user's window "went crazy". `tasklist`
+  *before* launching, and ask the user to quit theirs from the tray. The
+  mutex in v0.2.0+ blocks a second *guarded* instance, not an older one.
 - `setup.bat` [clean] — finds VS Build Tools via `vswhere`, builds with
   CMake/NMake, fetches the model, stages exe + whisper/ggml DLLs into
   `bin/`. Incremental: `build/` is kept, so a source edit rebuilds in ~30s
