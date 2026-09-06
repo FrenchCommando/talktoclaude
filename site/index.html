@@ -72,7 +72,7 @@
   #arm-up, #arm-rest { transition: opacity .25s; }
   .phase-press #arm-up, .phase-speak #arm-up { opacity: 1; }
   .phase-press #arm-rest, .phase-speak #arm-rest { opacity: 0; }
-  #mouth { transform-origin: 250px 86px; }
+  #mouth { transform-origin: 196px 136px; }
   .phase-speak #mouth { animation: talk .28s ease-in-out infinite alternate; }
   @keyframes talk { from { transform: scaleY(.3); } to { transform: scaleY(1.6); } }
   .wave { opacity: 0; stroke: var(--accent); }
@@ -144,34 +144,42 @@
 
   <h2>Watch it happen <small>Press the button. Meet Sticky. Sticky has earbuds and opinions.</small></h2>
   <div class="scene">
-    <svg id="scene" viewBox="0 0 900 260" role="img" aria-label="A stick figure taps an earbud, speaks, and the words appear on a laptop across the room.">
+    <svg id="scene" viewBox="0 0 900 268" role="img" aria-label="A stick figure slouched on a couch taps an earbud, speaks, and the words appear on a laptop across the room.">
       <!-- floor -->
       <line class="stroke" x1="20" y1="240" x2="880" y2="240" opacity=".35"/>
-      <!-- Sticky -->
+      <!-- couch -->
+      <g id="couch" class="stroke" style="fill: var(--line)">
+        <rect x="118" y="108" width="36" height="124" rx="14"/>
+        <rect x="130" y="188" width="212" height="34" rx="10"/>
+        <rect x="332" y="176" width="28" height="50" rx="11"/>
+        <rect x="118" y="218" width="242" height="22" rx="6"/>
+        <line x1="236" y1="192" x2="236" y2="220" opacity=".5"/>
+      </g>
+      <!-- Sticky, slouched -->
       <g id="sticky">
-        <circle class="stroke" cx="250" cy="70" r="24"/>
-        <circle class="fill" cx="242" cy="64" r="2.2"/>
-        <circle class="fill" cx="258" cy="64" r="2.2"/>
-        <path id="mouth" class="stroke" d="M243 84 q7 4 14 0"/>
+        <circle class="stroke" cx="196" cy="120" r="24"/>
+        <circle class="fill" cx="188" cy="114" r="2.2"/>
+        <circle class="fill" cx="204" cy="114" r="2.2"/>
+        <path id="mouth" class="stroke" d="M189 134 q7 4 14 0"/>
         <!-- earbud -->
-        <circle class="fill" cx="272" cy="72" r="4" style="fill: var(--accent)"/>
-        <circle id="tap" cx="272" cy="72" r="4"/>
-        <!-- body -->
-        <line class="stroke" x1="250" y1="94" x2="250" y2="170"/>
-        <!-- left arm (static) -->
-        <path class="stroke" d="M250 112 L215 150"/>
-        <!-- right arm: two poses, resting and hand on the earbud -->
-        <path id="arm-rest" class="stroke" d="M250 112 L268 140 L282 166"/>
-        <path id="arm-up" class="stroke" d="M250 112 L278 100 L276 80"/>
-        <!-- legs -->
-        <path class="stroke" d="M250 170 L228 238 M250 170 L272 238"/>
+        <circle class="fill" cx="218" cy="122" r="4" style="fill: var(--accent)"/>
+        <circle id="tap" cx="218" cy="122" r="4"/>
+        <!-- body, leaning back into the cushions -->
+        <path class="stroke" d="M204 142 L262 196"/>
+        <!-- left arm, resting on the lap -->
+        <path class="stroke" d="M222 158 L246 184 L270 186"/>
+        <!-- right arm: two poses, along the backrest and hand on the earbud -->
+        <path id="arm-rest" class="stroke" d="M222 158 L250 172 L286 194"/>
+        <path id="arm-up" class="stroke" d="M222 158 L242 136 L224 118"/>
+        <!-- legs, stretched out -->
+        <path class="stroke" d="M262 196 L310 202 L352 236 M262 196 L300 214 L336 238"/>
         <!-- sound waves -->
-        <g transform="translate(290 70)">
+        <g transform="translate(236 118)">
           <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
           <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
           <path class="stroke wave" d="M0 -14 a18 18 0 0 1 0 28"/>
         </g>
-        <text class="zzz" x="290" y="40">…couch mode…</text>
+        <text class="zzz" x="228" y="84">…couch mode…</text>
       </g>
       <!-- laptop -->
       <g id="laptop" transform="translate(560 100)">
@@ -188,7 +196,7 @@
         </g>
       </g>
       <!-- across the room -->
-      <text x="330" y="232" class="zzz" style="opacity:.7">← 4 metres, one thin wall, zero cables →</text>
+      <text x="380" y="254" class="zzz" style="opacity:.7">← 4 metres, one thin wall, zero cables →</text>
     </svg>
     <div class="cap">
       <span id="demo-status">Pixel Buds paired · base.en loaded · button owned by talktoclaude.exe</span>
