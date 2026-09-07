@@ -195,7 +195,13 @@ can't disagree.
   installer manifest carries an `InstallationMetadata` block naming
   `%LOCALAPPDATA%\Programs\talktoclaude` and `talktoclaude.exe` as the
   launch file. winget-releaser carries existing installer fields forward,
-  so updates keep it; check the generated PR the first time. Releases up to
+  so updates keep it; check the generated PR the first time. **Expect the
+  first merge to take weeks, not days.** Measured 2026-09-07 over the
+  last 30 merged New-Package PRs: median 15 days, quarter under 13,
+  quarter over 24, worst about 2 months; 1,211 new-package PRs were open.
+  The human review is the bottleneck. Updates skip it and merge in hours.
+  Measure again with `gh api search/issues?q=repo:microsoft/winget-pkgs+
+  is:pr+is:merged+label:New-Package` if it matters. Releases up to
   0.2.6 register in Apps as "talktoclaude version 0.2.6" (Inno's default),
   so `winget uninstall talktoclaude` finds nothing there; use the full
   name or `--id "{7C2B1B0E-6C3B-4F3E-9D3A-talktoclaude}_is1"`. The .iss
