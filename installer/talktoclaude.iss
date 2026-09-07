@@ -32,6 +32,9 @@ Compression=lzma2
 SolidCompression=yes
 ChangesEnvironment=yes
 UninstallDisplayIcon={app}\talktoclaude.exe
+; Inno's default is "talktoclaude version x.y.z", which `winget uninstall
+; talktoclaude` doesn't match. Register the plain name.
+UninstallDisplayName=talktoclaude
 SetupIconFile=..\talktoclaude.ico
 LicenseFile={#Src}\LICENSE
 #if Arch == "arm64"

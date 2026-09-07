@@ -179,7 +179,11 @@ can't disagree.
   `ReleaseNotesUrl`, and the two `InstallerSha256` (uppercase, from
   `sha256sum` on the release assets), then a PR from a branch of the fork
   titled "Update: FrenchCommando.talktoclaude version x.y.z". First-time
-  submitter: a CLA bot may ask the user to sign on the PR.
+  submitter: a CLA bot may ask the user to sign on the PR. Releases up to
+  0.2.6 register in Apps as "talktoclaude version 0.2.6" (Inno's default),
+  so `winget uninstall talktoclaude` finds nothing there; use the full
+  name or `--id "{7C2B1B0E-6C3B-4F3E-9D3A-talktoclaude}_is1"`. The .iss
+  sets `UninstallDisplayName=talktoclaude` from the next release on.
 - **TODO (pinned 2026-09-06): Microsoft Store.** Chosen over SignPath
   Foundation (free but the publisher name would be theirs) because Store
   installs skip SmartScreen entirely. Blocked on the developer account: a
