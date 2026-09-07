@@ -139,12 +139,17 @@ int main(int argc, char** argv) {
     }
 
     std::string modelPath = modelArg;
+    // The install never ships the model, so a download means this is the
+    // first launch — the one time a "ready" balloon earns its place. A
+    // window would take focus, which the injector must never see.
+    bool firstRun = false;
     if (modelPath.empty()) {
         bool announced = false;
         modelPath = Paths::defaultModel([&](int percent) {
             if (!announced) {
                 trigger.notify("talktoclaude", "First run: downloading the speech model (142 MB), once.");
                 announced = true;
+                firstRun = true;
             }
             char tip[64];
             snprintf(tip, sizeof(tip), "talktoclaude: downloading model %d%%", percent);
@@ -181,6 +186,11 @@ int main(int argc, char** argv) {
     Log::info("talktoclaude ready. Press Play/Pause to talk; recording ends itself "
               "after ~1.5s of silence (or a second press, where the hardware delivers one).\n");
     trigger.setState(Tray::State::Idle, "talktoclaude: ready");
+    if (firstRun) {
+        trigger.notify("talktoclaude is ready",
+                       "Press Play/Pause on your headset, speak, and the words are typed "
+                       "where the cursor is. It lives here in the notification area.");
+    }
 
     // run() pumps a Win32 message loop and blocks; that's fine, it's our
     // whole program's job right now.
