@@ -174,12 +174,21 @@ can't disagree.
   installer, en-US locale; schema 1.12.0), `winget validate` passed.
   winget's own download skips the browser and SmartScreen prompts, so it
   is the clean install path for the terminal crowd until the Store. **Per
-  release:** copy the three files to a new version folder, bump
-  `PackageVersion`, the two `InstallerUrl`s, `ReleaseDate`,
+  release, automated:** the `winget` job at the end of build.yml runs
+  `vedantmgoyal9/winget-releaser` after the release assets are up and
+  opens the update PR from the fork. It is a job in build.yml, not an
+  `on: release` workflow, because the release is created with
+  `GITHUB_TOKEN` and events from that token never trigger workflows. It
+  needs the `WINGET_TOKEN` repo secret: a *classic* PAT with `public_repo`
+  (fine-grained tokens aren't supported by the action), created and set by
+  the user (`gh secret set WINGET_TOKEN`). It only works once a first
+  version exists in winget-pkgs, so the 0.2.6 PR must merge before the
+  next tag; until the secret exists the job simply fails and nothing else
+  is affected. **Manual fallback:** copy the three files to a new version
+  folder, bump `PackageVersion`, the two `InstallerUrl`s, `ReleaseDate`,
   `ReleaseNotesUrl`, and the two `InstallerSha256` (uppercase, from
   `sha256sum` on the release assets), then a PR from a branch of the fork
-  titled "Update: FrenchCommando.talktoclaude version x.y.z". First-time
-  submitter: a CLA bot may ask the user to sign on the PR. Releases up to
+  titled "Update: FrenchCommando.talktoclaude version x.y.z". Releases up to
   0.2.6 register in Apps as "talktoclaude version 0.2.6" (Inno's default),
   so `winget uninstall talktoclaude` finds nothing there; use the full
   name or `--id "{7C2B1B0E-6C3B-4F3E-9D3A-talktoclaude}_is1"`. The .iss

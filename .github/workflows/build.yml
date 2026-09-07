@@ -119,3 +119,21 @@ jobs:
             dist/*.zip
             dist/*.exe
           generate_release_notes: true
+
+  # Opens the winget-pkgs PR for a new version, from the FrenchCommando
+  # fork, as a job here rather than an `on: release` workflow: the release
+  # above is created with GITHUB_TOKEN, and events caused by that token
+  # never trigger other workflows. Needs the WINGET_TOKEN secret, a classic
+  # PAT with public_repo scope, owned by the fork's user. Only useful once
+  # the package exists in winget-pkgs (first version merged by hand).
+  winget:
+    needs: windows
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      # version defaults to the tag without its "v"; release-tag to the ref.
+      - uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: FrenchCommando.talktoclaude
+          installers-regex: '-setup\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}
