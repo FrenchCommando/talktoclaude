@@ -18,6 +18,9 @@ From the [latest release](https://github.com/FrenchCommando/talktoclaude/release
   Settings like anything else.
 - `talktoclaude-<version>-windows-<arch>.zip` — the same files, portable.
 
+Or, once the [winget submission](https://github.com/microsoft/winget-pkgs/pull/430607)
+is merged: `winget install FrenchCommando.talktoclaude`.
+
 Either way the first run downloads the `base.en` model (142 MB) into
 `%LOCALAPPDATA%\talktoclaude\models`, and logs go to
 `%LOCALAPPDATA%\talktoclaude\logs`. `talktoclaude some\other\model.bin`
