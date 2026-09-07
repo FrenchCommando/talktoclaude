@@ -188,7 +188,12 @@ can't disagree.
   folder, bump `PackageVersion`, the two `InstallerUrl`s, `ReleaseDate`,
   `ReleaseNotesUrl`, and the two `InstallerSha256` (uppercase, from
   `sha256sum` on the release assets), then a PR from a branch of the fork
-  titled "Update: FrenchCommando.talktoclaude version x.y.z". Releases up to
+  titled "Update: FrenchCommando.talktoclaude version x.y.z". The
+  validation pipeline labels every version `Validation-Executable-Error`:
+  it can't find a "primary executable" after install because this is a
+  per-user LocalAppData install of a tray app with no window. Not a
+  failure; a moderator waves it through after a comment explaining that
+  (posted on the 0.2.6 PR). Expect it on each update. Releases up to
   0.2.6 register in Apps as "talktoclaude version 0.2.6" (Inno's default),
   so `winget uninstall talktoclaude` finds nothing there; use the full
   name or `--id "{7C2B1B0E-6C3B-4F3E-9D3A-talktoclaude}_is1"`. The .iss
