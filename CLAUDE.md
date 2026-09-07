@@ -185,7 +185,7 @@ can't disagree.
   `GITHUB_TOKEN` and events from that token never trigger workflows. It
   needs the `WINGET_TOKEN` repo secret: a *classic* PAT with `public_repo`
   (fine-grained tokens aren't supported by the action), created and set by
-  the user (`gh secret set WINGET_TOKEN`) — **set since 2026-09-07 02:04**,
+  the user (`gh secret set WINGET_TOKEN`) — **set 2026-09-06 evening** (`gh` shows 2026-09-07T02:04Z; GitHub timestamps are UTC, local is UTC-4),
   check with `gh secret list` before claiming it's missing. It only works
   once a first version exists in winget-pkgs, so the new-package PR must
   merge before the job can succeed (v0.2.7's run failed on cue); until
