@@ -168,6 +168,18 @@ can't disagree.
   Local `setup.bat` builds stay native and are fine on their own machine.
 - **Signing:** the exe is unsigned, so SmartScreen warns on first run.
   Deliberate for now; the fix costs a certificate.
+- **winget:** submitted 2026-09-06 as `FrenchCommando.talktoclaude` 0.2.6,
+  https://github.com/microsoft/winget-pkgs/pull/430607, from the fork
+  `FrenchCommando/winget-pkgs`. Three hand-written manifests (version,
+  installer, en-US locale; schema 1.12.0), `winget validate` passed.
+  winget's own download skips the browser and SmartScreen prompts, so it
+  is the clean install path for the terminal crowd until the Store. **Per
+  release:** copy the three files to a new version folder, bump
+  `PackageVersion`, the two `InstallerUrl`s, `ReleaseDate`,
+  `ReleaseNotesUrl`, and the two `InstallerSha256` (uppercase, from
+  `sha256sum` on the release assets), then a PR from a branch of the fork
+  titled "Update: FrenchCommando.talktoclaude version x.y.z". First-time
+  submitter: a CLA bot may ask the user to sign on the PR.
 - **TODO (pinned 2026-09-06): Microsoft Store.** Chosen over SignPath
   Foundation (free but the publisher name would be theirs) because Store
   installs skip SmartScreen entirely. Blocked on the developer account: a
