@@ -170,7 +170,11 @@ can't disagree.
   Deliberate for now; the fix costs a certificate.
 - **winget:** submitted 2026-09-06 as `FrenchCommando.talktoclaude` 0.2.6,
   https://github.com/microsoft/winget-pkgs/pull/430607, from the fork
-  `FrenchCommando/winget-pkgs`. Three hand-written manifests (version,
+  `FrenchCommando/winget-pkgs`; bumped in place to 0.2.7 on 2026-09-07
+  (same PR, same branch `FrenchCommando.talktoclaude-0.2.6`, one commit
+  swapping the version folder, PR retitled). While the new-package PR is
+  unmerged, re-tagging means this: edit the open PR, don't open another,
+  and it keeps its queue position. Three hand-written manifests (version,
   installer, en-US locale; schema 1.12.0), `winget validate` passed.
   winget's own download skips the browser and SmartScreen prompts, so it
   is the clean install path for the terminal crowd until the Store. **Per
@@ -182,9 +186,10 @@ can't disagree.
   needs the `WINGET_TOKEN` repo secret: a *classic* PAT with `public_repo`
   (fine-grained tokens aren't supported by the action), created and set by
   the user (`gh secret set WINGET_TOKEN`). It only works once a first
-  version exists in winget-pkgs, so the 0.2.6 PR must merge before the
-  next tag; until the secret exists the job simply fails and nothing else
-  is affected. **Manual fallback:** copy the three files to a new version
+  version exists in winget-pkgs, so the new-package PR must merge before
+  the job can succeed (v0.2.7's run failed on cue); until then, and until
+  the secret exists, the job simply fails and nothing else is affected.
+  **Manual fallback:** copy the three files to a new version
   folder, bump `PackageVersion`, the two `InstallerUrl`s, `ReleaseDate`,
   `ReleaseNotesUrl`, and the two `InstallerSha256` (uppercase, from
   `sha256sum` on the release assets), then a PR from a branch of the fork
@@ -205,7 +210,7 @@ can't disagree.
   0.2.6 register in Apps as "talktoclaude version 0.2.6" (Inno's default),
   so `winget uninstall talktoclaude` finds nothing there; use the full
   name or `--id "{7C2B1B0E-6C3B-4F3E-9D3A-talktoclaude}_is1"`. The .iss
-  sets `UninstallDisplayName=talktoclaude` from the next release on.
+  sets `UninstallDisplayName=talktoclaude` from 0.2.7 on.
 - **TODO (pinned 2026-09-06): Microsoft Store.** Chosen over SignPath
   Foundation (free but the publisher name would be theirs) because Store
   installs skip SmartScreen entirely. Blocked on the developer account: a
