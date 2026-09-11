@@ -166,6 +166,13 @@ can't disagree.
   ends after `whisper_backend_init_gpu` with no "ready", which is the
   signature. v0.2.1 fixed it; the CI zip was run on `[LAPTOP]` to confirm.
   Local `setup.bat` builds stay native and are fine on their own machine.
+- **The CRT is linked statically** (`CMAKE_MSVC_RUNTIME_LIBRARY` in
+  CMakeLists.txt, inherited by whisper/ggml). Up to v0.2.7 every shipped
+  binary imported VCRUNTIME140/MSVCP140/api-ms-win-crt-*, and the winget
+  validator's clean VM (no VC++ redist) reported `STATUS_DLL_NOT_FOUND`
+  on launch (PR comment 2026-09-11 UTC). Never showed on `[DESKTOP]` or
+  `[LAPTOP]` because both already had the redist. Verified locally
+  2026-09-10: no CRT DLL names in any staged binary, exe grew 1.6→2.9 MB.
 - **Signing:** the exe is unsigned, so SmartScreen warns on first run.
   Deliberate for now; the fix costs a certificate.
 - **winget:** submitted 2026-09-06 as `FrenchCommando.talktoclaude` 0.2.6,

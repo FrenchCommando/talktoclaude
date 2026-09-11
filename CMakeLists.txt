@@ -4,6 +4,14 @@ project(talktoclaude LANGUAGES CXX RC)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Static CRT (/MT), for this project and the fetched whisper/ggml targets:
+# the dynamic default made every shipped binary import VCRUNTIME140 /
+# MSVCP140 / api-ms-win-crt-*, and the winget validator's clean VM had no
+# VC++ redistributable, so v0.2.7's exe died with STATUS_DLL_NOT_FOUND
+# (0xC0000135) before main. Must be set before FetchContent so whisper and
+# ggml inherit it.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+
 if(NOT WIN32)
   message(FATAL_ERROR "talktoclaude targets Windows (WASAPI + Win32 SendInput/hooks).")
 endif()
