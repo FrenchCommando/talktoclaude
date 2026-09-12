@@ -179,7 +179,9 @@ can't disagree.
   runtime is redist-only and the static CRT does not cover it. Fixed
   2026-09-12 with `GGML_OPENMP=OFF` (ggml's own threadpool; `n_threads`
   still honoured); shipped as v0.2.9 the same day, release assets
-  checked clean. Check `dumpbin /DEPENDENTS` on *every* staged DLL, not
+  checked clean, and the validator passed for the first time
+  (`Validation-Completed` 2026-09-12 16:18 UTC; now waiting on a
+  moderator). Check `dumpbin /DEPENDENTS` on *every* staged DLL, not
   just the exe, before calling a dependency fixed. The same rebuild
   exposed a staging gap: the DLL copy was a POST_BUILD step on the exe,
   so a ggml-only change left stale DLLs in build\ and bin\; it is an
