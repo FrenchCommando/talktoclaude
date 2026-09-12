@@ -178,7 +178,8 @@ can't disagree.
   ggml-base.dll and ggml-cpu.dll importing **VCOMP140.DLL**: the OpenMP
   runtime is redist-only and the static CRT does not cover it. Fixed
   2026-09-12 with `GGML_OPENMP=OFF` (ggml's own threadpool; `n_threads`
-  still honoured). Check `dumpbin /DEPENDENTS` on *every* staged DLL, not
+  still honoured); shipped as v0.2.9 the same day, release assets
+  checked clean. Check `dumpbin /DEPENDENTS` on *every* staged DLL, not
   just the exe, before calling a dependency fixed. The same rebuild
   exposed a staging gap: the DLL copy was a POST_BUILD step on the exe,
   so a ggml-only change left stale DLLs in build\ and bin\; it is an
@@ -190,7 +191,7 @@ can't disagree.
 - **winget:** submitted 2026-09-06 as `FrenchCommando.talktoclaude` 0.2.6,
   https://github.com/microsoft/winget-pkgs/pull/430607, from the fork
   `FrenchCommando/winget-pkgs`; bumped in place to 0.2.7 on 2026-09-07
-  and to 0.2.8 on 2026-09-11 (same PR, same branch
+  to 0.2.8 on 2026-09-11, and to 0.2.9 on 2026-09-12 (same PR, same branch
   `FrenchCommando.talktoclaude-0.2.6`, one commit swapping the version
   folder, PR retitled). The fork checkout at `C:\Users\marti\winget-pkgs`
   is a full 671k-file clone whose working tree is partly missing; stage
