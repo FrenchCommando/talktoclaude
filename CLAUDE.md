@@ -173,13 +173,18 @@ can't disagree.
   on launch (PR comment 2026-09-11 UTC). Never showed on `[DESKTOP]` or
   `[LAPTOP]` because both already had the redist. Verified locally
   2026-09-10: no CRT DLL names in any staged binary, exe grew 1.6→2.9 MB.
+  Shipped as v0.2.8 (2026-09-11).
 - **Signing:** the exe is unsigned, so SmartScreen warns on first run.
   Deliberate for now; the fix costs a certificate.
 - **winget:** submitted 2026-09-06 as `FrenchCommando.talktoclaude` 0.2.6,
   https://github.com/microsoft/winget-pkgs/pull/430607, from the fork
   `FrenchCommando/winget-pkgs`; bumped in place to 0.2.7 on 2026-09-07
-  (same PR, same branch `FrenchCommando.talktoclaude-0.2.6`, one commit
-  swapping the version folder, PR retitled). While the new-package PR is
+  and to 0.2.8 on 2026-09-11 (same PR, same branch
+  `FrenchCommando.talktoclaude-0.2.6`, one commit swapping the version
+  folder, PR retitled). The fork checkout at `C:\Users\marti\winget-pkgs`
+  is a full 671k-file clone whose working tree is partly missing; stage
+  only the package folder (`git rm -r 0.2.x`, `git add 0.2.y`) and never
+  `git add -A` there. While the new-package PR is
   unmerged, re-tagging means this: edit the open PR, don't open another,
   and it keeps its queue position. Three hand-written manifests (version,
   installer, en-US locale; schema 1.12.0), `winget validate` passed.
