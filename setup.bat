@@ -67,7 +67,10 @@ if defined CLEAN (
 )
 
 echo === Configuring ===
-cmake -B build -S "%~dp0." -G "NMake Makefiles" >> "%LOG%" 2>&1
+REM Release explicitly: NMake is single-config and whisper.cpp's "default to
+REM Release" guard skips MSVC, so without this the local build was Debug
+REM (found 2026-09-12; every timing in CLAUDE.md before then was Debug).
+cmake -B build -S "%~dp0." -G "NMake Makefiles" -DCMAKE_BUILD_TYPE=Release >> "%LOG%" 2>&1
 if %ERRORLEVEL% neq 0 goto :fail
 REM A redirect that can't open the log leaves ERRORLEVEL at 0 while the
 REM command never runs, so check for what the step was supposed to produce.

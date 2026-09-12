@@ -183,9 +183,11 @@ can't disagree.
   just the exe, before calling a dependency fixed. The same rebuild
   exposed a staging gap: the DLL copy was a POST_BUILD step on the exe,
   so a ggml-only change left stale DLLs in build\ and bin\; it is an
-  `ALL` custom target now. Local `setup.bat` builds are `Debug`
-  (CMakeCache `CMAKE_BUILD_TYPE=Debug`, DLLs import `VCOMP140D`) — CI
-  is Release; the timings in this file came from the Debug build.
+  `ALL` custom target now. Local `setup.bat` builds were `Debug` until
+  2026-09-12 (NMake is single-config and whisper.cpp's Release default
+  skips MSVC), so every timing in this file before that date came from
+  a Debug build; setup.bat now passes `-DCMAKE_BUILD_TYPE=Release`
+  (exe 2.9→0.6 MB, ggml-cpu 4.3→1.0 MB). Re-measure before quoting.
 - **Signing:** the exe is unsigned, so SmartScreen warns on first run.
   Deliberate for now; the fix costs a certificate.
 - **winget:** submitted 2026-09-06 as `FrenchCommando.talktoclaude` 0.2.6,
