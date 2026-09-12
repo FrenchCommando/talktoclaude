@@ -173,7 +173,18 @@ can't disagree.
   on launch (PR comment 2026-09-11 UTC). Never showed on `[DESKTOP]` or
   `[LAPTOP]` because both already had the redist. Verified locally
   2026-09-10: no CRT DLL names in any staged binary, exe grew 1.6→2.9 MB.
-  Shipped as v0.2.8 (2026-09-11).
+  Shipped as v0.2.8 (2026-09-11) — and the validator failed again with
+  the same status, because `dumpbin /DEPENDENTS` on the 0.2.8 zip showed
+  ggml-base.dll and ggml-cpu.dll importing **VCOMP140.DLL**: the OpenMP
+  runtime is redist-only and the static CRT does not cover it. Fixed
+  2026-09-12 with `GGML_OPENMP=OFF` (ggml's own threadpool; `n_threads`
+  still honoured). Check `dumpbin /DEPENDENTS` on *every* staged DLL, not
+  just the exe, before calling a dependency fixed. The same rebuild
+  exposed a staging gap: the DLL copy was a POST_BUILD step on the exe,
+  so a ggml-only change left stale DLLs in build\ and bin\; it is an
+  `ALL` custom target now. Local `setup.bat` builds are `Debug`
+  (CMakeCache `CMAKE_BUILD_TYPE=Debug`, DLLs import `VCOMP140D`) — CI
+  is Release; the timings in this file came from the Debug build.
 - **Signing:** the exe is unsigned, so SmartScreen warns on first run.
   Deliberate for now; the fix costs a certificate.
 - **winget:** submitted 2026-09-06 as `FrenchCommando.talktoclaude` 0.2.6,

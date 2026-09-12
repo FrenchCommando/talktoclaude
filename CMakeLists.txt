@@ -22,6 +22,11 @@ endif()
 include(FetchContent)
 set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+# No OpenMP: the static CRT above does not cover it, so v0.2.8's ggml-base /
+# ggml-cpu DLLs still imported VCOMP140.DLL (redist-only) and the winget
+# validator kept failing with STATUS_DLL_NOT_FOUND. ggml falls back to its
+# own threadpool; n_threads is honoured either way.
+set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     whisper_cpp
     GIT_REPOSITORY https://github.com/ggerganov/whisper.cpp.git
@@ -86,12 +91,18 @@ target_link_libraries(talktoclaude PRIVATE
 target_compile_definitions(talktoclaude PRIVATE UNICODE _UNICODE)
 
 # whisper/ggml build as shared libs into build/bin; Windows only auto-loads
-# DLLs next to the exe (build/) or on PATH, so copy them alongside it.
-add_custom_command(TARGET talktoclaude POST_BUILD
+# DLLs next to the exe (build/) or on PATH, so copy them alongside it. A
+# separate ALL target rather than a POST_BUILD step on the exe: POST_BUILD
+# only runs when the exe relinks, so a ggml-only rebuild (2026-09-12,
+# GGML_OPENMP flipped) left stale DLLs next to it and setup.bat staged those.
+add_custom_target(talktoclaude_dlls ALL
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE:whisper>
         $<TARGET_FILE:ggml>
         $<TARGET_FILE:ggml-base>
         $<TARGET_FILE:ggml-cpu>
         $<TARGET_FILE_DIR:talktoclaude>
+    DEPENDS whisper ggml ggml-base ggml-cpu
+    VERBATIM
 )
+add_dependencies(talktoclaude_dlls talktoclaude)
