@@ -363,6 +363,20 @@ no symptom pointed at.
   Speed numbers stand; the accuracy column is not a model verdict —
   re-judge in a quiet room before drawing model conclusions. turbo is
   unusable on CPU and stays out of the running.
+- `[LAPTOP]` Release build, ggml threadpool (no OpenMP), built-in mic,
+  measured 2026-09-12 over 12 utterances: **5-7x spoken length** in the
+  steady state (3.4s in 0.6s, 6.6s in 0.9s). The old 1.0x laptop figure
+  is dead. Two outliers: the first call 0.7x (unexplained; whisper
+  allocates its buffers at init, so not lazy allocation — re-measure),
+  and a 1.4s clip that took **13.1s** and typed "So So True So True": a
+  repetition loop runs the decoder's full 220-step budget and the
+  ladder repeats it at two more temperatures. Fixed the same day with
+  `wparams.max_tokens` derived from the audio length (8 tokens/s + 16),
+  reasoned from whisper.cpp:7310 and the timing, not yet observed post-
+  fix. `whisper_print_timings` now logs encode/decode ms, decoder runs
+  and fallback counts per call, so the next slow call explains itself.
+  Also: base.en cannot hear "soju" (heard "so drew", "so true"); short
+  loanwords are a model limit, not a bug.
 - Transcription is CPU-only, and that is the project's scope, not a gap.
   whisper.cpp is built without a GPU backend (`no GPU found`,
   `backends = 1`, `use gpu = 1` inert), so the RX 9070 XT idles. Adding a

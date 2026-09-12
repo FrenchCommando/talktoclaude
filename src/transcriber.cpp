@@ -88,7 +88,16 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
     const int neededCtx = static_cast<int>(std::ceil(seconds * ctxPerSecond)) + ctxPerSecond;
     wparams.audio_ctx = std::min(fullCtx, std::max(kMinAudioCtx, neededCtx));
 
+    // Bound the decoder by what could have been said. A repetition loop
+    // never emits end-of-text, so without a cap the decoder runs its full
+    // 220-step budget, and the temperature ladder then repeats that twice
+    // more: [LAPTOP] 2026-09-12, 1.4s clip, 13.1s, "So So True So True".
+    // Speech is ~3 words/s and ~1.3 tokens/word; 8 tokens/s is over twice
+    // that, plus slack for punctuation and a slow start.
+    wparams.max_tokens = static_cast<int>(seconds * 8.0) + 16;
+
     const auto t0 = std::chrono::steady_clock::now();
+    whisper_reset_timings(impl_->ctx);
     const int rc =
         whisper_full(impl_->ctx, wparams, audio.data(), static_cast<int>(audio.size()));
     const double elapsed =
@@ -100,6 +109,11 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
     Log::info("[%.1fs audio in %.1fs (%.1fx spoken length), audio_ctx %d/%d, %d threads]\n",
               seconds, elapsed, elapsed > 0 ? seconds / elapsed : 0.0, wparams.audio_ctx,
               fullCtx, wparams.n_threads);
+    // Per-call breakdown (encode vs decode ms, decoder runs, ladder
+    // fallbacks) through whisper's logger, so a slow call in the log says
+    // where the time went instead of inviting a guess. Reset above so the
+    // numbers are this utterance's, not cumulative.
+    whisper_print_timings(impl_->ctx);
 
     std::string result;
     const int nSegments = whisper_full_n_segments(impl_->ctx);
