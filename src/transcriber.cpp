@@ -40,9 +40,8 @@ Transcriber::~Transcriber() { delete impl_; }
 
 bool Transcriber::loadModel(const std::string& modelPath) {
     // whisper/ggml are chatty (model dims, backend probing, per-run timings).
-    // Useful when something misbehaves, too noisy for the console — send it
-    // to the log file only.
-    whisper_log_set([](ggml_log_level, const char* text, void*) { Log::fileOnly("%s", text); },
+    // Useful when something misbehaves, so it all goes to the log.
+    whisper_log_set([](ggml_log_level, const char* text, void*) { Log::info("%s", text); },
                     nullptr);
 
     whisper_context_params cparams = whisper_context_default_params();
@@ -110,7 +109,7 @@ std::string Transcriber::transcribe(const std::vector<float>& audio) {
         // doubled decode apart from someone actually saying it twice, and
         // there is no dedupe here — a repeat that reaches this point is a
         // decode worth investigating, not one to paper over.
-        Log::fileOnly("[transcriber] segment %d [%lld..%lld] %s\n", i,
+        Log::info("[transcriber] segment %d [%lld..%lld] %s\n", i,
                       static_cast<long long>(whisper_full_get_segment_t0(impl_->ctx, i)),
                       static_cast<long long>(whisper_full_get_segment_t1(impl_->ctx, i)),
                       segment.c_str());

@@ -74,8 +74,10 @@ jobs:
         if: matrix.arch == 'x64'
         shell: pwsh
         run: |
-          # A windows-subsystem exe: its --help output goes to an attached
-          # console, not to a pipe, so check the exit code only.
+          # A windows-subsystem exe: --help prints to the parent console if
+          # it can attach one and stays silent otherwise, never a message
+          # box, so this cannot hang; check the exit code only. What it
+          # proves is that the exe starts at all (DLL resolution, CRT).
           $p = Start-Process -FilePath stage\x64\talktoclaude.exe -ArgumentList --help -Wait -PassThru -NoNewWindow
           if ($p.ExitCode -ne 0) { throw "--help exited $($p.ExitCode)" }
 

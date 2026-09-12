@@ -245,7 +245,7 @@ struct AudioCapture::Impl {
                 DWORD flags = 0;
                 hr = captureClient->GetBuffer(&data, &framesAvailable, &flags, nullptr, nullptr);
                 if (FAILED(hr)) {
-                    Log::fileOnly("[audio] GetBuffer failed: 0x%08lx\n", hr);
+                    Log::error("[audio] GetBuffer failed: 0x%08lx\n", hr);
                     break;
                 }
 
@@ -405,7 +405,7 @@ std::vector<float> AudioCapture::stop() {
     // capture thread is still holding, so it's not guaranteed; log and carry
     // on rather than pretending otherwise.
     const HRESULT resetHr = impl_->audioClient->Reset();
-    if (FAILED(resetHr)) Log::fileOnly("[audio] IAudioClient::Reset failed: 0x%08lx\n", resetHr);
+    if (FAILED(resetHr)) Log::error("[audio] IAudioClient::Reset failed: 0x%08lx\n", resetHr);
 
     std::lock_guard<std::mutex> lock(impl_->bufferMutex);
     std::vector<float> result = std::move(impl_->buffer);

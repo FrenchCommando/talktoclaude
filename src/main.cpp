@@ -15,54 +15,51 @@
 namespace {
 
 const char* const kUsage =
-    "usage: talktoclaude [--console] [model.bin]\n\n"
+    "usage: talktoclaude [model.bin]\n\n"
     "Runs in the notification area. Press the Play/Pause button on a Bluetooth\n"
     "headset (or a keyboard media key), speak, and stop; the transcript is typed\n"
     "into the focused window, then Enter. Click the icon to open the log folder\n"
     "or quit.\n\n"
     "Without a model argument the base.en whisper model is used, downloaded on\n"
     "first run into %LOCALAPPDATA%\\talktoclaude\\models. Logs go to the logs\\\n"
-    "folder next to it (or the repo's logs\\ when run from a checkout).\n"
-    "--console also prints everything to a console window.\n";
+    "folder next to it (or the repo's logs\\ when run from a checkout).\n";
 
-// The exe is a windows-subsystem app, so it has no console of its own.
-// --console attaches to the terminal it was launched from, or opens one.
-void attachConsole() {
-    if (!AttachConsole(ATTACH_PARENT_PROCESS)) AllocConsole();
+// The exe is a windows-subsystem app with no console; everything goes to
+// the log file. --help is the one thing that has to reach the terminal it
+// was typed in, so it attaches to that. Launched with no terminal there is
+// nowhere to print and nothing to say: no message box, so CI's exit-code
+// smoke test can never block on one.
+void showUsage() {
+    if (!AttachConsole(ATTACH_PARENT_PROCESS)) return;
     FILE* stream = nullptr;
     freopen_s(&stream, "CONOUT$", "w", stdout);
-    freopen_s(&stream, "CONOUT$", "w", stderr);
-    Log::setConsole(true);
+    printf("\n%s", kUsage);
+    fflush(stdout);
 }
 
-// Something went wrong before the tray icon could say so. With a console
-// the message is already there; without one, show it.
-void fatal(const char* message, bool haveConsole) {
+// Something went wrong before the tray icon could say so.
+void fatal(const char* message) {
     Log::error("%s\n", message);
-    if (!haveConsole) MessageBoxA(nullptr, message, "talktoclaude", MB_OK | MB_ICONERROR);
+    MessageBoxA(nullptr, message, "talktoclaude", MB_OK | MB_ICONERROR);
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
-    bool console = false;
     std::string modelArg;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--help") == 0 || std::strcmp(argv[i], "-h") == 0) {
-            attachConsole();
-            printf("%s", kUsage);
+            showUsage();
             return 0;
         }
-        if (std::strcmp(argv[i], "--console") == 0) console = true;
-        else modelArg = argv[i];
+        modelArg = argv[i];
     }
-    if (console) attachConsole();
 
     // Two instances would fight over the SMTC session and both type. The
     // second one leaves quietly; the tray icon already shows the first.
     const HANDLE instance = CreateMutexW(nullptr, TRUE, L"talktoclaude-single-instance");
     if (instance && GetLastError() == ERROR_ALREADY_EXISTS) {
-        fatal("talktoclaude is already running (see the notification area).", console);
+        fatal("talktoclaude is already running (see the notification area).");
         return 2;
     }
 
@@ -133,7 +130,7 @@ int main(int argc, char** argv) {
     triggerPtr = &trigger;
 
     if (!trigger.start()) {
-        fatal("Couldn't create the tray window.", console);
+        fatal("Couldn't create the tray window.");
         Log::close();
         return 1;
     }
@@ -154,26 +151,23 @@ int main(int argc, char** argv) {
             char tip[64];
             snprintf(tip, sizeof(tip), "talktoclaude: downloading model %d%%", percent);
             trigger.setState(Tray::State::Busy, tip);
-            if (console) { printf("\r[model] %d%%", percent); fflush(stdout); }
         });
-        if (console && announced) printf("\n");
     }
     if (modelPath.empty()) {
-        fatal("No model. Pass a path to a ggml whisper model, or check the log for the download error.",
-              console);
+        fatal("No model. Pass a path to a ggml whisper model, or check the log for the download error.");
         Log::close();
         return 1;
     }
 
     trigger.setState(Tray::State::Busy, "talktoclaude: loading model");
     if (!transcriber.loadModel(modelPath)) {
-        fatal(("Couldn't load the model at " + modelPath).c_str(), console);
+        fatal(("Couldn't load the model at " + modelPath).c_str());
         Log::close();
         return 1;
     }
 
     if (!capture.init()) {
-        fatal("Failed to initialize audio capture. Is a microphone connected?", console);
+        fatal("Failed to initialize audio capture. Is a microphone connected?");
         Log::close();
         return 1;
     }

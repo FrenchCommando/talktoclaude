@@ -78,8 +78,8 @@ public:
     void onTrayEvent(unsigned event);
 
     // Re-asserts the SMTC session after another app has taken it. Called on
-    // a timer while running, and by a global hotkey. `announce` logs to the
-    // console as well as the file.
+    // a timer while running, and by a global hotkey. `announce` writes a log
+    // line; the timer path passes false so the log isn't a line every 3s.
     void reclaim(bool announce);
 
     // Delivers a stop request to the run() thread. Safe to call from any

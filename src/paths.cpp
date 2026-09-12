@@ -78,7 +78,7 @@ std::wstring repoDir(const wchar_t* sub) {
 }
 
 // Plain WinHTTP GET to a file, following redirects (huggingface hands off to
-// a CDN), with a percentage on the console. Writes to <dest>.part and
+// a CDN), reporting progress through the callback. Writes to <dest>.part and
 // renames on success so a truncated download never looks like a model.
 bool download(const std::wstring& dest, const Paths::Progress& progress) {
     const std::wstring part = dest + L".part";
@@ -136,7 +136,7 @@ bool download(const std::wstring& dest, const Paths::Progress& progress) {
                     const int percent = static_cast<int>(received * 100 / total);
                     if (percent != lastPercent) {
                         if (progress) progress(percent);
-                        if (percent % 10 == 0) Log::fileOnly("[model] %d%%\n", percent);
+                        if (percent % 10 == 0) Log::info("[model] %d%%\n", percent);
                         lastPercent = percent;
                     }
                 }

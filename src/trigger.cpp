@@ -375,12 +375,12 @@ void Trigger::run() {
             continue;
         }
         if (msg.message == WM_TIMER && msg.wParam == reclaimTimerId_) {
-            // File only: every 3s, and the console is the dictation output.
+            // Quiet: this runs every 3s.
             reclaim(false);
             if (trayAdded_ && promoteAttempts_ > 0) {
                 if (Tray::promote()) {
                     promoteAttempts_ = 0;
-                    Log::fileOnly("[tray] icon promoted to the taskbar corner\n");
+                    Log::info("[tray] icon promoted to the taskbar corner\n");
                 } else if (--promoteAttempts_ == 0) {
                     Log::info("[tray] couldn't pin the icon to the taskbar corner; "
                               "Settings > Personalization > Taskbar > Other system tray icons\n");

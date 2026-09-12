@@ -10,7 +10,6 @@ namespace {
 
 FILE* g_file = nullptr;
 std::string g_path;
-bool g_console = false;
 
 // The capture thread, the trigger's message loop, and whisper's worker
 // threads all log. fprintf locks per-call, so nothing corrupts, but a line
@@ -19,17 +18,9 @@ bool g_console = false;
 // exactly when several threads are busy, which is when it's worth reading.
 std::mutex g_mutex;
 
-// Writes to the log file with a HH:MM:SS.mmm prefix. `console` gets the raw
-// line without the prefix, so the terminal keeps looking like it did.
-void emit(FILE* console, const char* fmt, va_list args) {
+// Writes to the log file with a HH:MM:SS.mmm prefix.
+void emit(const char* fmt, va_list args) {
     const std::lock_guard<std::mutex> lock(g_mutex);
-    if (console && g_console) {
-        va_list copy;
-        va_copy(copy, args);
-        vfprintf(console, fmt, copy);
-        va_end(copy);
-        fflush(console);
-    }
     if (!g_file) return;
     SYSTEMTIME t;
     GetLocalTime(&t);
@@ -41,8 +32,6 @@ void emit(FILE* console, const char* fmt, va_list args) {
 }  // namespace
 
 namespace Log {
-
-void setConsole(bool enabled) { g_console = enabled; }
 
 bool init(const std::string& dir) {
     SYSTEMTIME t;
@@ -77,21 +66,14 @@ void close() {
 void info(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    emit(stdout, fmt, args);
+    emit(fmt, args);
     va_end(args);
 }
 
 void error(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    emit(stderr, fmt, args);
-    va_end(args);
-}
-
-void fileOnly(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    emit(nullptr, fmt, args);
+    emit(fmt, args);
     va_end(args);
 }
 
